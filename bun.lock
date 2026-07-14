@@ -5,6 +5,7 @@
     "": {
       "name": "sheets",
       "dependencies": {
+        "@ai-sdk/anthropic": "^4.0.14",
         "@ai-sdk/react": "^4.0.27",
         "@base-ui/react": "^1.6.0",
         "@ingram-tech/nk-db": "^1.2.0",
@@ -41,6 +42,8 @@
   },
   "packages": {
     "@adobe/css-tools": ["@adobe/css-tools@4.5.0", "", {}, "sha512-6OzddxPio9UiWTCemp4N8cYLV2ZN1ncRnV1cVGtve7dhPOtRkleRyx32GQCYSwDYgaHU3USMm84tNsvKzRCa1Q=="],
+
+    "@ai-sdk/anthropic": ["@ai-sdk/anthropic@4.0.14", "", { "dependencies": { "@ai-sdk/provider": "4.0.3", "@ai-sdk/provider-utils": "5.0.9" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-2YQzgABM3StIEIByaWNiEqTHnvK8eRvXPSVeHjseVrN1Zud7xX7YExjGkFpt9brse3OZrUhg9kaDO7aXPEzq0Q=="],
 
     "@ai-sdk/gateway": ["@ai-sdk/gateway@4.0.19", "", { "dependencies": { "@ai-sdk/provider": "4.0.3", "@ai-sdk/provider-utils": "5.0.9", "@vercel/oidc": "3.2.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-pQ3UPO0tyLUuW751jdgWhvHmXmjvAFpyiTeZF6eSVHMYhH/dSH4FtSKGT2nOnvvpaRpU8ygsLV4ng2Mz0lcU/A=="],
 

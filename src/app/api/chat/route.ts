@@ -1,3 +1,4 @@
+import { anthropic } from "@ai-sdk/anthropic";
 import type { UIMessage } from "ai";
 import { convertToModelMessages, stepCountIs, streamText } from "ai";
 import { z } from "zod";
@@ -6,8 +7,8 @@ import { AGENT_TOOL_DESCRIPTIONS, agentToolSchemas } from "@/lib/agent-tools";
 
 export const maxDuration = 120;
 
-// AI Gateway model string ("provider/model"); override via env.
-const MODEL = process.env.SHEETS_CHAT_MODEL ?? "anthropic/claude-opus-4.8";
+// Direct Anthropic API (ANTHROPIC_API_KEY); model overridable via env.
+const MODEL = process.env.SHEETS_CHAT_MODEL ?? "claude-opus-4-8";
 
 const SYSTEM_PROMPT = `You are the spreadsheet agent of sheets.ingram.tech, working live inside the user's workbook. The user sees your cursor, highlights, and every cell you touch in real time.
 
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
 	const messages = parsed.data.messages;
 
 	const result = streamText({
-		model: MODEL,
+		model: anthropic(MODEL),
 		system: SYSTEM_PROMPT,
 		messages: await convertToModelMessages(messagesAsUi(messages)),
 		stopWhen: stepCountIs(24),

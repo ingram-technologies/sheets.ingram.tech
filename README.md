@@ -15,14 +15,13 @@ bun install
 bun run dev     # PGlite (no Docker) + migrations + next dev on :3000
 ```
 
-Chat needs an AI Gateway credential locally (`AI_GATEWAY_API_KEY`, e.g. via
-`vercel env pull`); everything else works without env. See
-[`docs/architecture.md`](./docs/architecture.md).
+Chat needs `ANTHROPIC_API_KEY` locally (e.g. via `vercel env pull`); everything
+else works without env. See [`docs/architecture.md`](./docs/architecture.md).
 
 ## Env
 
 | Var | What |
 | --- | --- |
 | `DATABASE_URL` | Postgres (unset locally — `bun run dev` boots PGlite) |
-| `AI_GATEWAY_API_KEY` | AI Gateway auth for local dev (on Vercel, OIDC is automatic) |
-| `SHEETS_CHAT_MODEL` | Optional model override, default `anthropic/claude-opus-4.8` |
+| `ANTHROPIC_API_KEY` | Anthropic API key for the agent chat |
+| `SHEETS_CHAT_MODEL` | Optional model override, default `claude-opus-4-8` |

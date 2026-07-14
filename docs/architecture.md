@@ -52,10 +52,10 @@ renderer reads `getSelectedView()` each frame.
 
 ## The agent loop
 
-- `/api/chat` (`src/app/api/chat/route.ts`): AI SDK `streamText` through the
-  Vercel AI Gateway (`SHEETS_CHAT_MODEL`, default `anthropic/claude-opus-4.8`).
-  Tools are declared **without `execute`** — the SDK forwards calls to the
-  browser.
+- `/api/chat` (`src/app/api/chat/route.ts`): AI SDK `streamText` against the
+  Anthropic API directly (`ANTHROPIC_API_KEY`; `SHEETS_CHAT_MODEL`, default
+  `claude-opus-4-8`). Tools are declared **without `execute`** — the SDK
+  forwards calls to the browser.
 - `ChatPanel.tsx` runs `onToolCall` → `AgentExecutor`
   (`agent-executor.ts`), which executes against the controller and returns a
   text result via `addToolOutput`;
