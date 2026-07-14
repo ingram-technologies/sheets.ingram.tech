@@ -31,9 +31,9 @@ export const agentToolSchemas = {
 			.string()
 			.describe("Top-left cell where the block of values is written, e.g. 'B2'."),
 		rows: z
-			.array(z.array(z.string()))
+			.array(z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])))
 			.describe(
-				"Rectangular block of cell inputs, row by row. Each string is exactly what a user would type: a formula ('=SUM(B2:B9)'), a number ('42'), text, or '' to leave the cell untouched.",
+				"Rectangular block of cell inputs, row by row. Strings are entered exactly as a user would type them (formulas start with '='); bare numbers and booleans are fine as-is. Use null (or '') to leave a cell untouched.",
 			),
 	}),
 	fill_range: z.object({

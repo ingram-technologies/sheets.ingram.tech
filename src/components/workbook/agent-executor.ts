@@ -189,8 +189,9 @@ export class AgentExecutor {
 			model.pauseEvaluation();
 			input.rows.forEach((row, r) => {
 				row.forEach((value, c) => {
-					if (value === "") return;
-					model.setUserInput(sheet, start.row + r, start.col + c, value);
+					const text = cellInputToString(value);
+					if (text === "") return;
+					model.setUserInput(sheet, start.row + r, start.col + c, text);
 				});
 			});
 			model.resumeEvaluation();
@@ -325,6 +326,14 @@ export class AgentExecutor {
 		this.controller.addHighlight({ sheet, range, note: input.note });
 		return `ok — highlighted ${input.sheet}!${formatRange(range)}`;
 	}
+}
+
+/** Normalize a set_cells entry to engine user input; null/'' means "skip". */
+function cellInputToString(value: string | number | boolean | null): string {
+	if (value === null) return "";
+	if (typeof value === "number") return String(value);
+	if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+	return value;
 }
 
 function formatChanges(changes: CellChange[]): string {

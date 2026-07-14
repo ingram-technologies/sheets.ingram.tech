@@ -84,12 +84,17 @@
 
 /*
  * Spreadsheet grid tokens — consumed by the canvas renderer via
- * getComputedStyle, so they live as raw custom properties. The user's
- * selection is classic spreadsheet blue; the agent's presence is violet so
- * human and machine cursors are never confusable (primary red stays reserved
- * for destructive/brand accents).
+ * getComputedStyle, so they live as raw custom properties. The grid is
+ * deliberately LIGHT in both app themes (spreadsheet "paper", like Google
+ * Sheets in a dark UI): cell content carries explicit user/engine colors
+ * (IronCalc's default font color is black), so a dark canvas would render
+ * black-on-grey. No `.dark` overrides here on purpose. The user's selection
+ * is classic spreadsheet blue; the agent's presence is violet so human and
+ * machine cursors are never confusable (primary red stays reserved for
+ * destructive/brand accents).
  */
-:root {
+:root,
+.dark {
 	--sheet-cell-bg: oklch(1 0 0);
 	--sheet-cell-fg: oklch(0.2664 0 0);
 	--sheet-grid-line: oklch(0.9319 0 0);
@@ -102,20 +107,6 @@
 	--sheet-agent-bg: oklch(0.5575 0.2 293.85 / 10%);
 	--sheet-pulse: oklch(0.78 0.16 80 / 35%);
 	--sheet-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-}
-
-.dark {
-	--sheet-cell-bg: oklch(0.2264 0 0);
-	--sheet-cell-fg: oklch(0.9219 0 0);
-	--sheet-grid-line: oklch(0.3211 0 0);
-	--sheet-header-bg: oklch(0.2686 0 0);
-	--sheet-header-fg: oklch(0.7155 0 0);
-	--sheet-header-active-bg: oklch(0.3711 0 0);
-	--sheet-selection: oklch(0.6461 0.14 253.71);
-	--sheet-selection-bg: oklch(0.6461 0.14 253.71 / 12%);
-	--sheet-agent: oklch(0.68 0.17 293.85);
-	--sheet-agent-bg: oklch(0.68 0.17 293.85 / 14%);
-	--sheet-pulse: oklch(0.82 0.15 80 / 30%);
 }
 
 @theme inline {
