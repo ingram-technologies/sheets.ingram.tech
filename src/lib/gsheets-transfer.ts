@@ -12,6 +12,15 @@ import { z } from "zod";
 
 export const SPREADSHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 
+/**
+ * Per-file Drive access (non-sensitive scope): lets the app list/search the
+ * spreadsheets it created or that the user picked via the Google Picker —
+ * NOT all of Drive. Full Drive listing scopes are restricted (heavy Google
+ * verification for the shared OAuth client), so browse-all goes through the
+ * Picker instead.
+ */
+export const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+
 /** Error code the client turns into a "grant Google Sheets access" prompt. */
 export const GOOGLE_SCOPE_MISSING = "google_scope_missing";
 

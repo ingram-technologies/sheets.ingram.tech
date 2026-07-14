@@ -29,8 +29,8 @@ export async function POST(request: Request) {
 		);
 	}
 	try {
-		const token = await getGoogleToken(session.user.id);
-		const { title, snapshot } = await importFromGoogle(token, spreadsheetId);
+		const { accessToken } = await getGoogleToken(session.user.id);
+		const { title, snapshot } = await importFromGoogle(accessToken, spreadsheetId);
 		return Response.json({ spreadsheetId, title, snapshot });
 	} catch (error) {
 		return gsheetsErrorResponse(error);

@@ -1,7 +1,11 @@
 "use client";
 
 import { authClient } from "@/lib/auth-client";
-import { GOOGLE_SCOPE_MISSING, SPREADSHEETS_SCOPE } from "@/lib/gsheets-transfer";
+import {
+	DRIVE_FILE_SCOPE,
+	GOOGLE_SCOPE_MISSING,
+	SPREADSHEETS_SCOPE,
+} from "@/lib/gsheets-transfer";
 
 /** True when an API error body is the "grant Google Sheets access" signal. */
 export function isScopeMissing(body: unknown): boolean {
@@ -14,14 +18,14 @@ export function isScopeMissing(body: unknown): boolean {
 }
 
 /**
- * Send the user through Google's incremental-consent flow for the
- * spreadsheets scope (they declined the optional checkbox at sign-in).
- * Navigates away; on return they land back on `callbackPath`.
+ * Send the user through Google's incremental-consent flow for the Sheets
+ * scopes (they declined the optional checkboxes at sign-in, or granted only
+ * one of the pair). Navigates away; on return they land on `callbackPath`.
  */
 export async function requestSpreadsheetsAccess(callbackPath: string): Promise<void> {
 	await authClient.linkSocial({
 		provider: "google",
-		scopes: [SPREADSHEETS_SCOPE],
+		scopes: [SPREADSHEETS_SCOPE, DRIVE_FILE_SCOPE],
 		callbackURL: callbackPath,
 	});
 }

@@ -30,11 +30,15 @@ export async function POST(request: Request, { params }: Params) {
 	}
 
 	try {
-		const token = await getGoogleToken(session.user.id);
-		const { spreadsheetId } = await exportToGoogle(token, parsed.data.snapshot, {
-			title: meta.name,
-			spreadsheetId: meta.googleSpreadsheetId,
-		});
+		const { accessToken } = await getGoogleToken(session.user.id);
+		const { spreadsheetId } = await exportToGoogle(
+			accessToken,
+			parsed.data.snapshot,
+			{
+				title: meta.name,
+				spreadsheetId: meta.googleSpreadsheetId,
+			},
+		);
 		if (spreadsheetId !== meta.googleSpreadsheetId) {
 			await linkGoogleSpreadsheet(id, spreadsheetId);
 		}

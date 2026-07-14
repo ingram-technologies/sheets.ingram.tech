@@ -1,8 +1,14 @@
 "use client";
 
-import { FileInput } from "lucide-react";
+import {
+	ExternalLink,
+	FileSpreadsheet,
+	FolderSearch,
+	Link2,
+	Search,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -10,7 +16,6 @@ import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
-	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
@@ -20,7 +25,8 @@ import { ensureIronCalc } from "@/components/workbook/ironcalc";
 import { modelFromSnapshot } from "@/components/workbook/google-snapshot";
 import { bytesToBase64 } from "@/lib/bytes";
 import { isScopeMissing, requestSpreadsheetsAccess } from "@/lib/google-access";
-import { snapshotSchema } from "@/lib/gsheets-transfer";
+import { pickerConfig, pickSpreadsheet } from "@/lib/google-picker";
+import { parseSpreadsheetRef, snapshotSchema } from "@/lib/gsheets-transfer";
 
 const importResponseSchema = z.object({
 	spreadsheetId: z.string(),
@@ -30,20 +36,76 @@ const importResponseSchema = z.object({
 
 const createdSchema = z.object({ id: z.string() });
 
+const searchResponseSchema = z.object({
+	files: z.array(
+		z.object({
+			id: z.string(),
+			name: z.string(),
+			modifiedTime: z.string().nullable(),
+		}),
+	),
+});
+
+const tokenResponseSchema = z.object({ accessToken: z.string() });
+
+type Listing = z.infer<typeof searchResponseSchema>["files"][number];
+
 /**
- * "Open from Google Sheets": paste a spreadsheet URL (or id), the server
- * reads it into a neutral snapshot, the browser builds the engine workbook
- * from it, and the new workbook keeps the 1:1 link so "Save to Google
- * Sheets" writes back to the same spreadsheet.
+ * "Open from Google Sheets": one input that searches the user's reachable
+ * spreadsheets (drive.file grant: created by this app or previously picked)
+ * AND accepts a pasted URL/id; plus "Browse Google Drive" via the Google
+ * Picker for everything else. Importing establishes the 1:1 link, so "Save
+ * to Google Sheets" writes back to the same spreadsheet.
  */
 export function OpenFromGoogle() {
 	const router = useRouter();
 	const [open, setOpen] = useState(false);
-	const [ref, setRef] = useState("");
+	const [query, setQuery] = useState("");
+	const [results, setResults] = useState<Listing[] | null>(null);
+	const [searching, setSearching] = useState(false);
+	const [scopeMissing, setScopeMissing] = useState(false);
 	const [importing, setImporting] = useState(false);
+	const [browsing, setBrowsing] = useState(false);
 
-	const importSheet = async () => {
-		if (!ref.trim()) return;
+	const linkedId = parseSpreadsheetRef(query);
+	const picker = pickerConfig();
+
+	// Debounced search; an empty query lists the most recent spreadsheets.
+	// Skipped while the input holds a pasted link — that's an import, not a
+	// search.
+	useEffect(() => {
+		if (!open || linkedId) return;
+		let cancelled = false;
+		setSearching(true);
+		const timer = setTimeout(() => {
+			void (async () => {
+				try {
+					const response = await fetch(
+						`/api/gsheets/search?q=${encodeURIComponent(query)}`,
+					);
+					const body: unknown = await response.json();
+					if (cancelled) return;
+					if (!response.ok) {
+						setResults(null);
+						setScopeMissing(isScopeMissing(body));
+						return;
+					}
+					setScopeMissing(false);
+					setResults(searchResponseSchema.parse(body).files);
+				} catch {
+					if (!cancelled) setResults(null);
+				} finally {
+					if (!cancelled) setSearching(false);
+				}
+			})();
+		}, 250);
+		return () => {
+			cancelled = true;
+			clearTimeout(timer);
+		};
+	}, [open, query, linkedId]);
+
+	const importSheet = async (ref: string) => {
 		setImporting(true);
 		try {
 			const response = await fetch("/api/gsheets/import", {
@@ -54,15 +116,7 @@ export function OpenFromGoogle() {
 			const body: unknown = await response.json();
 			if (!response.ok) {
 				if (isScopeMissing(body)) {
-					setOpen(false);
-					toast("Sheets needs access to your Google Sheets", {
-						description:
-							"Google asked for this permission separately at sign-in.",
-						action: {
-							label: "Grant access",
-							onClick: () => void requestSpreadsheetsAccess("/"),
-						},
-					});
+					setScopeMissing(true);
 					return;
 				}
 				throw new Error(apiError(body) ?? `import failed (${response.status})`);
@@ -92,54 +146,208 @@ export function OpenFromGoogle() {
 		}
 	};
 
+	// The Picker draws its own full-screen overlay, which would fight the
+	// dialog's focus trap — close the dialog first, import from the pick.
+	const browseDrive = async () => {
+		if (!picker) return;
+		setBrowsing(true);
+		try {
+			const response = await fetch("/api/gsheets/token");
+			const body: unknown = await response.json();
+			if (!response.ok) {
+				if (isScopeMissing(body)) {
+					setScopeMissing(true);
+					return;
+				}
+				throw new Error(apiError(body) ?? "Google token unavailable");
+			}
+			const { accessToken } = tokenResponseSchema.parse(body);
+			setOpen(false);
+			const picked = await pickSpreadsheet(picker, accessToken);
+			if (!picked) return;
+			toast.promise(importSheet(picked), {
+				loading: "Importing from Google Sheets…",
+			});
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Browse failed");
+		} finally {
+			setBrowsing(false);
+		}
+	};
+
+	const reset = () => {
+		setQuery("");
+		setResults(null);
+		setScopeMissing(false);
+		setImporting(false);
+	};
+
 	return (
 		<>
 			<Button variant="outline" onClick={() => setOpen(true)}>
-				<FileInput className="size-4" />
+				<FileSpreadsheet className="size-4" />
 				Open from Google Sheets
 			</Button>
 			<Dialog
 				open={open}
 				onOpenChange={(next) => {
-					if (!importing) setOpen(next);
+					if (importing) return;
+					setOpen(next);
+					if (!next) reset();
 				}}
 			>
-				<DialogContent className="max-w-md">
+				<DialogContent className="max-w-lg gap-3">
 					<DialogHeader>
 						<DialogTitle>Open from Google Sheets</DialogTitle>
 						<DialogDescription>
-							Paste a Google Sheets link (or spreadsheet id). The imported
-							workbook stays linked, so saving sends changes back to the
-							same spreadsheet.
+							The imported workbook stays linked — saving sends changes
+							back to the same spreadsheet.
 						</DialogDescription>
 					</DialogHeader>
-					<form
-						onSubmit={(event) => {
-							event.preventDefault();
-							void importSheet();
-						}}
-					>
+
+					<div className="relative">
+						<Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 						<Input
 							autoFocus
-							placeholder="https://docs.google.com/spreadsheets/d/…"
-							value={ref}
-							onChange={(event) => setRef(event.target.value)}
+							className="pl-8"
+							placeholder="Search your spreadsheets, or paste a link…"
+							value={query}
+							onChange={(event) => setQuery(event.target.value)}
+							onKeyDown={(event) => {
+								if (event.key !== "Enter" || importing) return;
+								if (linkedId) void importSheet(linkedId);
+								else if (results?.length === 1 && results[0]) {
+									void importSheet(results[0].id);
+								}
+							}}
 							disabled={importing}
 						/>
-						<DialogFooter className="mt-4">
+					</div>
+
+					<div className="min-h-48 overflow-y-auto rounded-md border border-border">
+						{scopeMissing ? (
+							<ScopePrompt />
+						) : linkedId ? (
+							<ResultRow
+								icon={Link2}
+								title="Import from this link"
+								subtitle={linkedId}
+								disabled={importing}
+								onClick={() => void importSheet(linkedId)}
+							/>
+						) : searching && !results ? (
+							<SearchSkeleton />
+						) : results && results.length > 0 ? (
+							<div className={searching ? "opacity-60" : undefined}>
+								{results.map((file) => (
+									<ResultRow
+										key={file.id}
+										icon={FileSpreadsheet}
+										title={file.name}
+										subtitle={formatModified(file.modifiedTime)}
+										disabled={importing}
+										onClick={() => void importSheet(file.id)}
+									/>
+								))}
+							</div>
+						) : (
+							<p className="px-4 py-8 text-center text-sm text-muted-foreground">
+								{query
+									? "No matches. Search only sees spreadsheets this app created or opened before — paste a link or browse Drive for the rest."
+									: "Spreadsheets you save or open here will show up for quick access. Paste a link or browse Drive to get started."}
+							</p>
+						)}
+					</div>
+
+					<div className="flex items-center justify-between">
+						{picker ? (
 							<Button
-								type="submit"
+								variant="ghost"
 								size="sm"
-								disabled={importing || !ref.trim()}
+								className="text-muted-foreground"
+								disabled={browsing || importing}
+								onClick={() => void browseDrive()}
 							>
-								{importing ? "Importing…" : "Import"}
+								<FolderSearch className="size-4" />
+								{browsing ? "Opening Drive…" : "Browse Google Drive"}
 							</Button>
-						</DialogFooter>
-					</form>
+						) : (
+							<span />
+						)}
+						{importing ? (
+							<span className="text-xs text-muted-foreground">
+								Importing…
+							</span>
+						) : null}
+					</div>
 				</DialogContent>
 			</Dialog>
 		</>
 	);
+}
+
+function ResultRow({
+	icon: Icon,
+	title,
+	subtitle,
+	disabled,
+	onClick,
+}: {
+	icon: typeof FileSpreadsheet;
+	title: string;
+	subtitle: string | null;
+	disabled: boolean;
+	onClick: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			disabled={disabled}
+			onClick={onClick}
+			className="flex w-full items-center gap-2.5 border-b border-border px-3 py-2.5 text-left last:border-b-0 hover:bg-accent/50 disabled:opacity-50"
+		>
+			<Icon className="size-4 shrink-0 text-muted-foreground" />
+			<span className="min-w-0 flex-1 truncate text-sm">{title}</span>
+			{subtitle ? (
+				<span className="shrink-0 text-xs text-muted-foreground">
+					{subtitle}
+				</span>
+			) : null}
+			<ExternalLink className="size-3.5 shrink-0 text-muted-foreground/50" />
+		</button>
+	);
+}
+
+function ScopePrompt() {
+	return (
+		<div className="flex flex-col items-center gap-3 px-6 py-8 text-center">
+			<p className="text-sm text-muted-foreground">
+				Sheets needs access to your Google Sheets — Google asked for this
+				permission separately at sign-in.
+			</p>
+			<Button size="sm" onClick={() => void requestSpreadsheetsAccess("/")}>
+				Grant access with Google
+			</Button>
+		</div>
+	);
+}
+
+function SearchSkeleton() {
+	return (
+		<div className="space-y-2 p-3">
+			{[0, 1, 2].map((row) => (
+				<div key={row} className="h-8 animate-pulse rounded bg-accent/40" />
+			))}
+		</div>
+	);
+}
+
+function formatModified(iso: string | null): string | null {
+	if (!iso) return null;
+	const date = new Date(iso);
+	return Number.isNaN(date.getTime())
+		? null
+		: date.toLocaleDateString(undefined, { dateStyle: "medium" });
 }
 
 function apiError(body: unknown): string | null {

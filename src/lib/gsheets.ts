@@ -11,6 +11,8 @@ import {
 	type WorkbookSnapshot,
 } from "@/lib/gsheets-transfer";
 
+const DRIVE_API = "https://www.googleapis.com/drive/v3/files";
+
 /**
  * Server half of the Google Sheets bridge. The browser owns the engine and
  * sends/receives neutral snapshots (`gsheets-transfer.ts`); this module owns
@@ -65,8 +67,14 @@ export function gsheetsErrorResponse(error: unknown): Response {
 	throw error;
 }
 
-/** Access token for the user's Google account, refreshed by Better Auth. */
-export async function getGoogleToken(userId: string): Promise<string> {
+/**
+ * Access token for the user's Google account, refreshed by Better Auth.
+ * Throws `no_scope` unless every scope in `required` was granted.
+ */
+export async function getGoogleToken(
+	userId: string,
+	required: string[] = [SPREADSHEETS_SCOPE],
+): Promise<{ accessToken: string; scopes: string[] }> {
 	let accessToken: string;
 	let scopes: string[];
 	try {
@@ -76,10 +84,10 @@ export async function getGoogleToken(userId: string): Promise<string> {
 	} catch {
 		throw new GsheetsError({ kind: "no_account" });
 	}
-	if (!scopes.includes(SPREADSHEETS_SCOPE)) {
+	if (!required.every((scope) => scopes.includes(scope))) {
 		throw new GsheetsError({ kind: "no_scope" });
 	}
-	return accessToken;
+	return { accessToken, scopes };
 }
 
 async function googleFetch(
@@ -303,6 +311,59 @@ function numberFormatType(pattern: string): string {
 	if (p.includes("%")) return "PERCENT";
 	if (/[$€£¥]/.test(p)) return "CURRENCY";
 	return "NUMBER";
+}
+
+// ── Search (drive.file listing) ─────────────────────────────────────────────
+
+const driveListSchema = z.object({
+	files: z.array(
+		z
+			.object({
+				id: z.string(),
+				name: z.string(),
+				modifiedTime: z.string().optional(),
+			})
+			.loose(),
+	),
+});
+
+export type SpreadsheetListing = {
+	id: string;
+	name: string;
+	modifiedTime: string | null;
+};
+
+/**
+ * Spreadsheets visible under the `drive.file` grant: ones this app created
+ * plus ones the user picked via the Google Picker. Empty `query` returns the
+ * most recently modified.
+ */
+export async function searchSpreadsheets(
+	token: string,
+	query: string,
+): Promise<SpreadsheetListing[]> {
+	const terms = [
+		"mimeType='application/vnd.google-apps.spreadsheet'",
+		"trashed=false",
+	];
+	const trimmed = query.trim();
+	if (trimmed) {
+		terms.push(
+			`name contains '${trimmed.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`,
+		);
+	}
+	const params = new URLSearchParams({
+		q: terms.join(" and "),
+		orderBy: "modifiedTime desc",
+		pageSize: "20",
+		fields: "files(id,name,modifiedTime)",
+	});
+	const raw = await googleFetch(token, `${DRIVE_API}?${params}`);
+	return driveListSchema.parse(raw).files.map((file) => ({
+		id: file.id,
+		name: file.name,
+		modifiedTime: file.modifiedTime ?? null,
+	}));
 }
 
 // ── Import (open from Google Sheets) ────────────────────────────────────────

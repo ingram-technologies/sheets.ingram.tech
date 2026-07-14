@@ -101,7 +101,11 @@ A workbook links **1:1** to a Google spreadsheet (`workbook.
 google_spreadsheet_id`). "Save to Google Sheets" (File menu) creates the
 spreadsheet on first save and **full-replaces** the same one after — this app
 is the source of truth for linked workbooks. "Open from Google Sheets"
-(home page) imports by URL/id and establishes the link, so saving writes back.
+(home page) searches spreadsheets reachable under the `drive.file` grant
+(created by this app or previously picked), accepts a pasted URL/id, and —
+when the Picker env vars are set — offers "Browse Google Drive" through the
+Google Picker (Google's own UI; picking a file grants this app access to
+just that file). Importing establishes the link, so saving writes back.
 
 The split follows the engine split: the browser builds/consumes a neutral
 snapshot — values, formulas, number formats (`src/lib/gsheets-transfer.ts`
@@ -110,9 +114,10 @@ schema, `google-snapshot.ts` builder) — and the server
 token from Better Auth's `account` table (`auth.api.getAccessToken`
 refreshes it). If the user declined the optional spreadsheets scope at
 sign-in, routes answer `google_scope_missing` and the client offers
-incremental consent via `linkSocial`. Richer style transfer and a browse
-picker (needs the Google Picker API — Drive listing scopes are restricted)
-are follow-ups.
+incremental consent via `linkSocial`. Full-Drive *listing* scopes are
+restricted (heavy verification for the shared OAuth client), which is why
+browse goes through the Picker + non-sensitive `drive.file` instead. Richer
+style transfer is a follow-up.
 
 ## What is deliberately NOT here yet
 
