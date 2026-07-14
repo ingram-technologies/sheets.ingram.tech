@@ -15,6 +15,13 @@
 			"when": 1784051679887,
 			"tag": "0001_better_auth",
 			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "7",
+			"when": 1784056466545,
+			"tag": "0002_workbook_uuid_ids",
+			"breakpoints": true
 		}
 	]
 }

@@ -2,6 +2,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db, schema } from "./db";
+import { ids } from "./ids";
 
 export const workbookMetaSchema = z.object({
 	id: z.string(),
@@ -21,6 +22,9 @@ const metaColumns = {
 	updatedAt: schema.workbooks.updatedAt,
 };
 
+// The id codec lives at this boundary: rows carry UUIDv7, everything returned
+// or accepted here uses the public `wb_…` skin. A malformed/mismatched public
+// id decodes to null and behaves exactly like a missing row.
 function toMeta(row: {
 	id: string;
 	name: string;
@@ -29,7 +33,7 @@ function toMeta(row: {
 	updatedAt: Date;
 }): WorkbookMeta {
 	return {
-		id: row.id,
+		id: ids.workbook.encode(row.id),
 		name: row.name,
 		size: row.size,
 		createdAt: row.createdAt.toISOString(),
@@ -46,24 +50,27 @@ export async function listWorkbooks(): Promise<WorkbookMeta[]> {
 }
 
 export async function getWorkbookMeta(id: string): Promise<WorkbookMeta | null> {
+	const uuid = ids.workbook.decodeOrNull(id);
+	if (!uuid) return null;
 	const rows = await db
 		.select(metaColumns)
 		.from(schema.workbooks)
-		.where(eq(schema.workbooks.id, id));
+		.where(eq(schema.workbooks.id, uuid));
 	const row = rows[0];
 	return row ? toMeta(row) : null;
 }
 
 export async function getWorkbookBytes(id: string): Promise<Uint8Array | null> {
+	const uuid = ids.workbook.decodeOrNull(id);
+	if (!uuid) return null;
 	const rows = await db
 		.select({ bytes: schema.workbooks.bytes })
 		.from(schema.workbooks)
-		.where(eq(schema.workbooks.id, id));
+		.where(eq(schema.workbooks.id, uuid));
 	return rows[0]?.bytes ?? null;
 }
 
 export async function createWorkbook(input: {
-	id: string;
 	name: string;
 	bytes: Uint8Array;
 }): Promise<WorkbookMeta> {
@@ -77,10 +84,12 @@ export async function saveWorkbookBytes(
 	id: string,
 	bytes: Uint8Array,
 ): Promise<WorkbookMeta | null> {
+	const uuid = ids.workbook.decodeOrNull(id);
+	if (!uuid) return null;
 	const rows = await db
 		.update(schema.workbooks)
 		.set({ bytes, updatedAt: new Date() })
-		.where(eq(schema.workbooks.id, id))
+		.where(eq(schema.workbooks.id, uuid))
 		.returning(metaColumns);
 	const row = rows[0];
 	return row ? toMeta(row) : null;
@@ -90,19 +99,23 @@ export async function renameWorkbook(
 	id: string,
 	name: string,
 ): Promise<WorkbookMeta | null> {
+	const uuid = ids.workbook.decodeOrNull(id);
+	if (!uuid) return null;
 	const rows = await db
 		.update(schema.workbooks)
 		.set({ name, updatedAt: new Date() })
-		.where(eq(schema.workbooks.id, id))
+		.where(eq(schema.workbooks.id, uuid))
 		.returning(metaColumns);
 	const row = rows[0];
 	return row ? toMeta(row) : null;
 }
 
 export async function deleteWorkbook(id: string): Promise<boolean> {
+	const uuid = ids.workbook.decodeOrNull(id);
+	if (!uuid) return false;
 	const rows = await db
 		.delete(schema.workbooks)
-		.where(eq(schema.workbooks.id, id))
+		.where(eq(schema.workbooks.id, uuid))
 		.returning({ id: schema.workbooks.id });
 	return rows.length > 0;
 }

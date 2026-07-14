@@ -1,4 +1,3 @@
-import { nanoid } from "nanoid";
 import { z } from "zod";
 
 import { requireApiSession } from "@/lib/session";
@@ -24,7 +23,6 @@ export async function POST(request: Request) {
 		return Response.json({ error: z.treeifyError(parsed.error) }, { status: 400 });
 	}
 	const meta = await createWorkbook({
-		id: nanoid(12),
 		name: parsed.data.name,
 		bytes: Uint8Array.from(Buffer.from(parsed.data.bytes, "base64")),
 	});
