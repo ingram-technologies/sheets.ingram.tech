@@ -88,7 +88,14 @@ export async function POST(request: Request) {
 		},
 	});
 
-	return result.toUIMessageStreamResponse();
+	return result.toUIMessageStreamResponse({
+		// Surface the real failure to the chat panel instead of the SDK's
+		// masked default ("An error occurred.") — this app has no third-party
+		// users yet and gateway errors (billing tier, model access, rate
+		// limits) are exactly what the person in front of it needs to see.
+		onError: (error) =>
+			error instanceof Error ? error.message : "Chat failed — check server logs.",
+	});
 }
 
 function messagesAsUi(messages: unknown[]): UIMessage[] {
