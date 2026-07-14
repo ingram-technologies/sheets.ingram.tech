@@ -7,11 +7,20 @@ shaped so the sheetd/channel wiring (plan §8) slots in without rework.
 
 ## The engine runs in the browser
 
-`@ironcalc/wasm` (pinned, currently 0.7.0) provides the full IronCalc
-`UserModel`: formula evaluation, undo/redo, styles, number formats, fills,
-clipboard, and per-sheet view state (selection, scroll anchor). The wasm
-binary is copied to `public/ironcalc/` by `scripts/copy-wasm.ts` (predev /
-prebuild) and fetched once per page.
+`@ironcalc/wasm` provides the full IronCalc `UserModel`: formula evaluation,
+undo/redo, styles, number formats, fills, clipboard, and per-sheet view state
+(selection, scroll anchor). The wasm binary is copied to `public/ironcalc/`
+by `scripts/copy-wasm.ts` (predev / prebuild) and fetched once per page.
+
+The package is **vendored at `vendor/ironcalc-wasm/`** (a `file:` dependency),
+built from the same pinned git revision of upstream IronCalc that sheetkit
+uses — see the rev in the vendored `package.json` version and sheetkit's
+workspace `Cargo.toml`. The published npm release lags main by ~150 functions
+(SUMPRODUCT, FILTER, SORT, UNIQUE, LET, LAMBDA, …) and the dynamic-array
+engine, which users hit immediately. To rebuild: check out the rev in the
+IronCalc repo, `make all` in `bindings/wasm` (needs `wasm-pack` and a
+TypeScript for the `types.ts` step), copy `pkg/` here, delete its
+`.gitignore`, and set the rev-suffixed version.
 
 The server stores workbooks as **opaque engine bytes** (`Model.toBytes()`,
 IronCalc's bitcode format) in a Postgres `bytea` column. Creating a workbook
@@ -20,8 +29,10 @@ bytes. Consequences:
 
 - the server has no spreadsheet logic and no wasm dependency;
 - the bytes format is version-locked to the pinned `@ironcalc/wasm` — bump it
-  deliberately (old blobs must load in the new engine; IronCalc has kept
-  `from_bytes` compatible so far, but test on a copy);
+  deliberately. This is NOT theoretical: the 0.7.0 → git-main bump broke
+  decoding (verified — "invalid packing"), and the UI shows a clear
+  "saved by an older engine" error for such blobs. Migrate through xlsx
+  before bumping if the stored workbooks matter;
 - when sheetd (the server-side engine, from the public sheetkit repo) arrives,
   it speaks the same format, and the blob store moves behind it.
 

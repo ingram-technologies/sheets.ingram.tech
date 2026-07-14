@@ -1,0 +1,24 @@
+{
+  "name": "@ironcalc/wasm",
+  "type": "module",
+  "collaborators": [
+    "Nicolas Hatcher <nicolas@theuniverse.today>"
+  ],
+  "description": "IronCalc Web bindings",
+  "version": "0.7.1-git.9ee7e066",
+  "license": "MIT/Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ironcalc/ironcalc"
+  },
+  "files": [
+    "wasm_bg.wasm",
+    "wasm.js",
+    "wasm.d.ts"
+  ],
+  "main": "wasm.js",
+  "types": "wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

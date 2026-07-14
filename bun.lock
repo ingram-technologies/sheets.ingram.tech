@@ -11,7 +11,7 @@
         "@better-auth/passkey": "^1.6.23",
         "@ingram-tech/nk-auth": "^0.12.2",
         "@ingram-tech/nk-db": "^1.2.0",
-        "@ironcalc/wasm": "0.7.0",
+        "@ironcalc/wasm": "file:vendor/ironcalc-wasm",
         "ai": "^7.0.18",
         "better-auth": "^1.6.23",
         "class-variance-authority": "^0.7.1",
@@ -263,7 +263,7 @@
 
     "@ingram-tech/nk-dev": ["@ingram-tech/nk-dev@0.4.1", "", { "dependencies": { "@testing-library/jest-dom": "^6.9.1", "@typescript/native": "npm:typescript@^7.0.2", "jsdom": "^29.1.1", "knip": "^6.25.0", "oxfmt": "^0.58.0", "oxlint": "^1.73.0", "typescript": "npm:@typescript/typescript6@^6.0.2", "vitest": "^4.1.10" }, "bin": { "nk": "bin/nk.js", "nextkit-format-staged": "bin/format-staged.mjs" } }, "sha512-pFK1Ot3KgnI6oP04Nf4v/NxdBUiu4XBGgsYdr/tGN0c7erMna8mg4U2QoIJU0fRg2y7ojT7Qd+QkdeUo++r/0Q=="],
 
-    "@ironcalc/wasm": ["@ironcalc/wasm@0.7.0", "", {}, "sha512-57QjqpZYxc70HrgS8TLrpv3ndeVZKSHnK8admaYbWBz/yFdON73pHLLQxKwEW0tFfUfjokKehGl5ZKH+lnJz5A=="],
+    "@ironcalc/wasm": ["@ironcalc/wasm@file:vendor/ironcalc-wasm", {}],
 
     "@jridgewell/gen-mapping": ["@jridgewell/gen-mapping@0.3.13", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.0", "@jridgewell/trace-mapping": "^0.3.24" } }, "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="],
 

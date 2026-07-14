@@ -27,7 +27,7 @@
 		"@better-auth/passkey": "^1.6.23",
 		"@ingram-tech/nk-auth": "^0.12.2",
 		"@ingram-tech/nk-db": "^1.2.0",
-		"@ironcalc/wasm": "0.7.0",
+		"@ironcalc/wasm": "file:vendor/ironcalc-wasm",
 		"ai": "^7.0.18",
 		"better-auth": "^1.6.23",
 		"class-variance-authority": "^0.7.1",

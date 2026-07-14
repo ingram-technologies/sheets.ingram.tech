@@ -16,6 +16,7 @@ export { columnNameFromNumber, Model } from "@ironcalc/wasm";
 export type {
 	Area,
 	CellStyle,
+	Color,
 	SelectedView,
 	WorksheetProperties,
 } from "@ironcalc/wasm";

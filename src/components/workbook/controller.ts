@@ -1,6 +1,7 @@
 import type {
 	Area,
 	CellStyle,
+	Color,
 	Model,
 	SelectedView,
 	WorksheetProperties,
@@ -174,7 +175,14 @@ export class WorkbookController {
 	}
 
 	cellStyle(sheet: number, row: number, col: number): CellStyle {
-		return this.model.getCellStyle(sheet, row, col);
+		// getCellStyle grew conditional-formatting extras (icon, data bar,
+		// rating) we don't render yet; unwrap to the plain style.
+		return this.model.getCellStyle(sheet, row, col).style;
+	}
+
+	/** Theme-aware color resolution: "" means "no color set". */
+	resolveColor(color: Color): string {
+		return this.model.resolveColor(color);
 	}
 
 	/** Bounding box of non-empty cells, or null for an empty sheet. */

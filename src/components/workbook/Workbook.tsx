@@ -51,8 +51,15 @@ export function Workbook({ id, name: initialName }: { id: string; name: string }
 				setController(new WorkbookController(model));
 			} catch (error) {
 				if (!cancelled) {
+					const message =
+						error instanceof Error ? error.message : String(error);
+					// Engine bytes are version-locked; a decode failure means the
+					// workbook was saved by an older engine build (see
+					// docs/architecture.md) — say so instead of leaking wasm noise.
 					setLoadError(
-						error instanceof Error ? error.message : String(error),
+						message.includes("parsing workbook")
+							? "This workbook was saved by an older engine version and cannot be opened by this build. Re-import it from an .xlsx export."
+							: message,
 					);
 				}
 			}

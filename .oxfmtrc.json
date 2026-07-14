@@ -22,6 +22,7 @@
 		"**/*.html",
 		"dist",
 		".next",
-		"build"
+		"build",
+		"vendor"
 	]
 }

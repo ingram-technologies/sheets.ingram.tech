@@ -80,16 +80,13 @@ export async function buildXlsxBuffer(
 				if (style.font.u) font.underline = true;
 				if (style.font.strike) font.strike = true;
 				if (style.font.sz) font.size = style.font.sz;
-				const fontColor = toArgb(style.font.color);
+				const fontColor = toArgb(controller.resolveColor(style.font.color));
 				// Skip default black — let Excel's theme drive it.
 				if (fontColor && fontColor !== "FF000000")
 					font.color = { argb: fontColor };
 				if (Object.keys(font).length > 0) cell.font = font;
 
-				const fillColor =
-					style.fill.pattern_type !== "none"
-						? toArgb(style.fill.fg_color)
-						: null;
+				const fillColor = toArgb(controller.resolveColor(style.fill.color));
 				if (fillColor) {
 					cell.fill = {
 						type: "pattern",

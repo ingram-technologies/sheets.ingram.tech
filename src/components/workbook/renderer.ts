@@ -218,8 +218,8 @@ function drawCells(
 	for (let row = visible.rowStart; row <= visible.rowEnd; row++) {
 		for (let col = visible.colStart; col <= visible.colEnd; col++) {
 			const style = controller.cellStyle(sheet, row, col);
-			const bg = style.fill.fg_color;
-			if (style.fill.pattern_type !== "none" && bg) {
+			const bg = controller.resolveColor(style.fill.color);
+			if (bg !== "") {
 				const rect = cellRect(controller, sheet, row, col, viewport);
 				ctx.fillStyle = bg;
 				ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
@@ -238,7 +238,7 @@ function drawCells(
 			const font = style.font;
 			const px = Math.round((font.sz || 11) * (4 / 3));
 			ctx.font = `${font.i ? "italic " : ""}${font.b ? "600" : "400"} ${px}px ${colors.font}`;
-			ctx.fillStyle = font.color || colors.cellFg;
+			ctx.fillStyle = controller.resolveColor(font.color) || colors.cellFg;
 
 			const cellType = controller.model.getCellType(sheet, row, col);
 			const horizontal = style.alignment?.horizontal ?? "general";
