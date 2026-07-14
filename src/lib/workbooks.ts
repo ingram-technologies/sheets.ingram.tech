@@ -1,0 +1,108 @@
+import { desc, eq, sql } from "drizzle-orm";
+import { z } from "zod";
+
+import { db, schema } from "./db";
+
+export const workbookMetaSchema = z.object({
+	id: z.string(),
+	name: z.string(),
+	size: z.number(),
+	createdAt: z.iso.datetime(),
+	updatedAt: z.iso.datetime(),
+});
+
+export type WorkbookMeta = z.infer<typeof workbookMetaSchema>;
+
+const metaColumns = {
+	id: schema.workbooks.id,
+	name: schema.workbooks.name,
+	size: sql<number>`octet_length(${schema.workbooks.bytes})`.mapWith(Number),
+	createdAt: schema.workbooks.createdAt,
+	updatedAt: schema.workbooks.updatedAt,
+};
+
+function toMeta(row: {
+	id: string;
+	name: string;
+	size: number;
+	createdAt: Date;
+	updatedAt: Date;
+}): WorkbookMeta {
+	return {
+		id: row.id,
+		name: row.name,
+		size: row.size,
+		createdAt: row.createdAt.toISOString(),
+		updatedAt: row.updatedAt.toISOString(),
+	};
+}
+
+export async function listWorkbooks(): Promise<WorkbookMeta[]> {
+	const rows = await db
+		.select(metaColumns)
+		.from(schema.workbooks)
+		.orderBy(desc(schema.workbooks.updatedAt));
+	return rows.map(toMeta);
+}
+
+export async function getWorkbookMeta(id: string): Promise<WorkbookMeta | null> {
+	const rows = await db
+		.select(metaColumns)
+		.from(schema.workbooks)
+		.where(eq(schema.workbooks.id, id));
+	const row = rows[0];
+	return row ? toMeta(row) : null;
+}
+
+export async function getWorkbookBytes(id: string): Promise<Uint8Array | null> {
+	const rows = await db
+		.select({ bytes: schema.workbooks.bytes })
+		.from(schema.workbooks)
+		.where(eq(schema.workbooks.id, id));
+	return rows[0]?.bytes ?? null;
+}
+
+export async function createWorkbook(input: {
+	id: string;
+	name: string;
+	bytes: Uint8Array;
+}): Promise<WorkbookMeta> {
+	const rows = await db.insert(schema.workbooks).values(input).returning(metaColumns);
+	const row = rows[0];
+	if (!row) throw new Error("insert returned no row");
+	return toMeta(row);
+}
+
+export async function saveWorkbookBytes(
+	id: string,
+	bytes: Uint8Array,
+): Promise<WorkbookMeta | null> {
+	const rows = await db
+		.update(schema.workbooks)
+		.set({ bytes, updatedAt: new Date() })
+		.where(eq(schema.workbooks.id, id))
+		.returning(metaColumns);
+	const row = rows[0];
+	return row ? toMeta(row) : null;
+}
+
+export async function renameWorkbook(
+	id: string,
+	name: string,
+): Promise<WorkbookMeta | null> {
+	const rows = await db
+		.update(schema.workbooks)
+		.set({ name, updatedAt: new Date() })
+		.where(eq(schema.workbooks.id, id))
+		.returning(metaColumns);
+	const row = rows[0];
+	return row ? toMeta(row) : null;
+}
+
+export async function deleteWorkbook(id: string): Promise<boolean> {
+	const rows = await db
+		.delete(schema.workbooks)
+		.where(eq(schema.workbooks.id, id))
+		.returning({ id: schema.workbooks.id });
+	return rows.length > 0;
+}

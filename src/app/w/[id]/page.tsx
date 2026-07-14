@@ -1,0 +1,27 @@
+import { notFound } from "next/navigation";
+
+import { Workbook } from "@/components/workbook/Workbook";
+import { getWorkbookMeta } from "@/lib/workbooks";
+
+export const dynamic = "force-dynamic";
+
+export default async function WorkbookPage({
+	params,
+}: {
+	params: Promise<{ id: string }>;
+}) {
+	const { id } = await params;
+	const meta = await getWorkbookMeta(id);
+	if (!meta) notFound();
+	return <Workbook id={meta.id} name={meta.name} />;
+}
+
+export async function generateMetadata({
+	params,
+}: {
+	params: Promise<{ id: string }>;
+}) {
+	const { id } = await params;
+	const meta = await getWorkbookMeta(id);
+	return { title: meta?.name ?? "Workbook" };
+}

@@ -1,0 +1,21 @@
+# deps / build
+node_modules/
+.next/
+out/
+tsconfig.tsbuildinfo
+
+# env
+.env
+.env.local
+.env*.local
+
+# local dev db
+.pglite/
+
+# copied from @ironcalc/wasm by scripts/copy-wasm.ts
+public/ironcalc/
+
+# misc
+.DS_Store
+*.pem
+.vercel
