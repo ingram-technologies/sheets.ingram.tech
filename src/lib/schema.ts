@@ -20,6 +20,9 @@ export const workbooks = pgTable("workbook", {
 		.default(sql`uuidv7()`),
 	name: text("name").notNull(),
 	bytes: bytea("bytes").notNull(),
+	// 1:1 link to a Google Sheets spreadsheet ("Save to Google Sheets"
+	// re-saves to it; import sets it). External id we don't mint → text.
+	googleSpreadsheetId: text("google_spreadsheet_id"),
 	createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

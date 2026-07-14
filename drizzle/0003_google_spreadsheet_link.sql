@@ -1,0 +1,1 @@
+ALTER TABLE "workbook" ADD COLUMN "google_spreadsheet_id" text;

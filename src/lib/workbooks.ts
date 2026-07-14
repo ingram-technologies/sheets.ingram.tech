@@ -8,6 +8,7 @@ export const workbookMetaSchema = z.object({
 	id: z.string(),
 	name: z.string(),
 	size: z.number(),
+	googleSpreadsheetId: z.string().nullable(),
 	createdAt: z.iso.datetime(),
 	updatedAt: z.iso.datetime(),
 });
@@ -18,6 +19,7 @@ const metaColumns = {
 	id: schema.workbooks.id,
 	name: schema.workbooks.name,
 	size: sql<number>`octet_length(${schema.workbooks.bytes})`.mapWith(Number),
+	googleSpreadsheetId: schema.workbooks.googleSpreadsheetId,
 	createdAt: schema.workbooks.createdAt,
 	updatedAt: schema.workbooks.updatedAt,
 };
@@ -29,6 +31,7 @@ function toMeta(row: {
 	id: string;
 	name: string;
 	size: number;
+	googleSpreadsheetId: string | null;
 	createdAt: Date;
 	updatedAt: Date;
 }): WorkbookMeta {
@@ -36,6 +39,7 @@ function toMeta(row: {
 		id: ids.workbook.encode(row.id),
 		name: row.name,
 		size: row.size,
+		googleSpreadsheetId: row.googleSpreadsheetId,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
 	};
@@ -73,11 +77,27 @@ export async function getWorkbookBytes(id: string): Promise<Uint8Array | null> {
 export async function createWorkbook(input: {
 	name: string;
 	bytes: Uint8Array;
+	googleSpreadsheetId?: string;
 }): Promise<WorkbookMeta> {
 	const rows = await db.insert(schema.workbooks).values(input).returning(metaColumns);
 	const row = rows[0];
 	if (!row) throw new Error("insert returned no row");
 	return toMeta(row);
+}
+
+/** Record (or refresh) the 1:1 link after a "Save to Google Sheets". */
+export async function linkGoogleSpreadsheet(
+	id: string,
+	googleSpreadsheetId: string,
+): Promise<boolean> {
+	const uuid = ids.workbook.decodeOrNull(id);
+	if (!uuid) return false;
+	const rows = await db
+		.update(schema.workbooks)
+		.set({ googleSpreadsheetId })
+		.where(eq(schema.workbooks.id, uuid))
+		.returning({ id: schema.workbooks.id });
+	return rows.length > 0;
 }
 
 export async function saveWorkbookBytes(

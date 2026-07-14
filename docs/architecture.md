@@ -95,6 +95,25 @@ dirty. API routes are thin Drizzle queries (`src/lib/workbooks.ts`); the dev
 database is PGlite over a local socket (`bun run dev`), prod is the shared
 Ingram RDS instance (see the `sheets` stack in the infra repo).
 
+## Google Sheets bridge
+
+A workbook links **1:1** to a Google spreadsheet (`workbook.
+google_spreadsheet_id`). "Save to Google Sheets" (File menu) creates the
+spreadsheet on first save and **full-replaces** the same one after — this app
+is the source of truth for linked workbooks. "Open from Google Sheets"
+(home page) imports by URL/id and establishes the link, so saving writes back.
+
+The split follows the engine split: the browser builds/consumes a neutral
+snapshot — values, formulas, number formats (`src/lib/gsheets-transfer.ts`
+schema, `google-snapshot.ts` builder) — and the server
+(`src/lib/gsheets.ts`) exchanges it with the Sheets v4 API using the OAuth
+token from Better Auth's `account` table (`auth.api.getAccessToken`
+refreshes it). If the user declined the optional spreadsheets scope at
+sign-in, routes answer `google_scope_missing` and the client offers
+incremental consent via `linkSocial`. Richer style transfer and a browse
+picker (needs the Google Picker API — Drive listing scopes are restricted)
+are follow-ups.
+
 ## What is deliberately NOT here yet
 
 - **Membership / per-user workspaces** — sign-in exists (Better Auth via
@@ -102,10 +121,11 @@ Ingram RDS instance (see the `sheets` stack in the infra repo).
   but every signed-in user still shares ONE workspace — no ownership columns,
   no sharing model. Sign-in also (optionally, via Google's granular consent)
   requests the `spreadsheets` scope and stores a refresh token in the
-  `account` table for future Google Sheets import/export.
+  `account` table — the Google Sheets bridge above runs on it.
 - **sheetd + realtime channel** — single-client editing only; the engine diff
   queue (`flushSendQueue`/`applyExternalDiffs`) is unused until then.
-- **xlsx/csv import-export, gsheets** — arrive with sheetd (server-side
-  import keeps the client thin).
+- **csv + xlsx import** — xlsx *export* and the Google Sheets bridge exist
+  client-side; file imports arrive with sheetd (server-side import keeps the
+  client thin).
 - **Frozen panes, merged cells, borders UI, wrap text** — engine supports
   them; renderer/toolbar don't yet.

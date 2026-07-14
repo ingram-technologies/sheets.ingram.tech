@@ -15,7 +15,13 @@ export default async function WorkbookPage({
 	const { id } = await params;
 	const meta = await getWorkbookMeta(id);
 	if (!meta) notFound();
-	return <Workbook id={meta.id} name={meta.name} />;
+	return (
+		<Workbook
+			id={meta.id}
+			name={meta.name}
+			googleSpreadsheetId={meta.googleSpreadsheetId}
+		/>
+	);
 }
 
 export async function generateMetadata({

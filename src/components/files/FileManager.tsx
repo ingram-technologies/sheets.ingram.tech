@@ -34,7 +34,9 @@ import {
 } from "@/components/ui/table";
 import { toast } from "@/components/ui/toaster";
 import { UserMenu } from "@/components/auth/UserMenu";
+import { OpenFromGoogle } from "@/components/files/OpenFromGoogle";
 import { ensureIronCalc, Model } from "@/components/workbook/ironcalc";
+import { bytesToBase64 } from "@/lib/bytes";
 import type { WorkbookMeta } from "@/lib/workbooks";
 
 export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
@@ -113,6 +115,7 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 				className="mb-4 border-b-0 px-0 sm:px-0"
 				actions={
 					<>
+						<OpenFromGoogle />
 						<Button
 							onClick={() => void createWorkbook()}
 							disabled={creating}
@@ -271,12 +274,6 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 			) : null}
 		</main>
 	);
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-	let binary = "";
-	for (const byte of bytes) binary += String.fromCharCode(byte);
-	return btoa(binary);
 }
 
 function formatSize(bytes: number): string {
