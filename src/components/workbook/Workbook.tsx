@@ -1,13 +1,17 @@
 "use client";
 
-import { ArrowLeft, Grid3x3 } from "lucide-react";
+import { ArrowLeft, Download, Grid3x3 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ChatPanel } from "@/components/chat/ChatPanel";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/toaster";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { WorkbookController } from "./controller";
 import { ensureIronCalc, Model } from "./ironcalc";
+import { exportXlsx } from "./export-xlsx";
 import { FormulaBar } from "./FormulaBar";
 import type { EditingState } from "./Grid";
 import { Grid } from "./Grid";
@@ -19,11 +23,13 @@ type SaveState = "saved" | "dirty" | "saving" | "error";
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
 
-export function Workbook({ id, name }: { id: string; name: string }) {
+export function Workbook({ id, name: initialName }: { id: string; name: string }) {
 	const [controller, setController] = useState<WorkbookController | null>(null);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [saveState, setSaveState] = useState<SaveState>("saved");
 	const [editing, setEditing] = useState<EditingState | null>(null);
+	const [name, setName] = useState(initialName);
+	const [exporting, setExporting] = useState(false);
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const saveStateRef = useRef<SaveState>("saved");
 	saveStateRef.current = saveState;
@@ -136,7 +142,38 @@ export function Workbook({ id, name }: { id: string; name: string }) {
 					<ArrowLeft className="size-4" />
 				</Link>
 				<Grid3x3 className="size-4 text-primary" />
-				<WorkbookName id={id} initial={name} />
+				<WorkbookName id={id} name={name} setName={setName} />
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<Button
+								variant="ghost"
+								size="icon"
+								aria-label="Download as Excel"
+								className="size-7 text-muted-foreground"
+								disabled={!controller || exporting}
+								onClick={async () => {
+									if (!controller) return;
+									setExporting(true);
+									try {
+										await exportXlsx(controller, name);
+									} catch (error) {
+										toast.error(
+											error instanceof Error
+												? error.message
+												: "Export failed",
+										);
+									} finally {
+										setExporting(false);
+									}
+								}}
+							>
+								<Download className="size-4" />
+							</Button>
+						}
+					/>
+					<TooltipContent>Download as Excel (.xlsx)</TooltipContent>
+				</Tooltip>
 				<span className="ml-auto text-[11px] text-muted-foreground">
 					{saveState === "saved" && "Saved"}
 					{saveState === "dirty" && "Unsaved changes"}
@@ -177,19 +214,28 @@ export function Workbook({ id, name }: { id: string; name: string }) {
 	);
 }
 
-function WorkbookName({ id, initial }: { id: string; initial: string }) {
-	const [value, setValue] = useState(initial);
+function WorkbookName({
+	id,
+	name,
+	setName,
+}: {
+	id: string;
+	name: string;
+	setName: (name: string) => void;
+}) {
+	const [value, setValue] = useState(name);
 
 	const commit = async () => {
-		const name = value.trim();
-		if (!name || name === initial) {
-			setValue(name || initial);
+		const next = value.trim();
+		if (!next || next === name) {
+			setValue(next || name);
 			return;
 		}
+		setName(next);
 		await fetch(`/api/workbooks/${id}`, {
 			method: "PATCH",
 			headers: { "content-type": "application/json" },
-			body: JSON.stringify({ name }),
+			body: JSON.stringify({ name: next }),
 		});
 	};
 
