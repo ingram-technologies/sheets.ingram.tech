@@ -14,7 +14,7 @@ import type { AgentToolName } from "@/lib/agent-tools";
 import { agentToolSchemas } from "@/lib/agent-tools";
 import { cn } from "@/lib/utils";
 
-import { AgentExecutor } from "../workbook/agent-executor";
+import { AgentExecutor, buildWorkbookOverview } from "../workbook/agent-executor";
 import type { WorkbookController } from "../workbook/controller";
 
 const TOOL_LABELS: Record<AgentToolName, string> = {
@@ -40,8 +40,27 @@ export function ChatPanel({ controller }: { controller: WorkbookController }) {
 	const [input, setInput] = useState("");
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 
+	// Every request carries a fresh workbook sketch (the user may have edited
+	// cells since the last turn), injected server-side into the latest user
+	// message so the cached prompt prefix stays intact.
+	const transport = useMemo(
+		() =>
+			new DefaultChatTransport({
+				api: "/api/chat",
+				prepareSendMessagesRequest: ({ id, messages, body }) => ({
+					body: {
+						id,
+						messages,
+						overview: buildWorkbookOverview(controller).slice(0, 16000),
+						...body,
+					},
+				}),
+			}),
+		[controller],
+	);
+
 	const { messages, sendMessage, addToolOutput, status, error, stop } = useChat({
-		transport: new DefaultChatTransport({ api: "/api/chat" }),
+		transport,
 		sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
 		async onToolCall({ toolCall }) {
 			if (toolCall.dynamic) return;

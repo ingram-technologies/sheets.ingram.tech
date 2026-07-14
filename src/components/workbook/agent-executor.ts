@@ -109,49 +109,11 @@ export class AgentExecutor {
 	// ── reads ──
 
 	private overview(): string {
-		const sheets = this.controller.sheets();
-		const lines: string[] = [`workbook: ${sheets.length} sheet(s)`];
-		sheets.forEach((sheet, index) => {
-			if (sheet.state !== "visible") return;
-			const used = this.controller.usedRange(index);
-			if (!used) {
-				lines.push(`\n## ${sheet.name} — empty`);
-				return;
-			}
-			lines.push(`\n## ${sheet.name} — used range ${formatRange(used)}`);
-			if (cellCount(used) <= OVERVIEW_DENSE_CAP) {
-				lines.push(this.renderGrid(index, used));
-			} else {
-				// Header row + shape hint.
-				const headerRange = { ...used, endRow: used.startRow };
-				lines.push(
-					`row ${used.startRow}: ${this.renderGrid(index, headerRange)}`,
-				);
-				lines.push(
-					`(${used.endRow - used.startRow} more rows × ${used.endCol - used.startCol + 1} columns — use read_range for details)`,
-				);
-			}
-		});
-		return lines.join("\n");
+		return buildWorkbookOverview(this.controller);
 	}
 
 	private renderGrid(sheet: number, range: CellRange): string {
-		const rows: string[] = [];
-		for (let row = range.startRow; row <= range.endRow; row++) {
-			const cells: string[] = [];
-			for (let col = range.startCol; col <= range.endCol; col++) {
-				const content = this.controller.cellContent(sheet, row, col);
-				const value = this.controller.formattedValue(sheet, row, col);
-				if (content.startsWith("=")) cells.push(`${content} ⇒ ${value}`);
-				else cells.push(value);
-			}
-			rows.push(`${row} | ${cells.join("\t")}`);
-		}
-		const header = Array.from(
-			{ length: range.endCol - range.startCol + 1 },
-			(_, i) => columnToLetters(range.startCol + i),
-		).join("\t");
-		return `  | ${header}\n${rows.join("\n")}`;
+		return renderGridText(this.controller, sheet, range);
 	}
 
 	private readRange(input: AgentToolInput<"read_range">): string {
@@ -326,6 +288,61 @@ export class AgentExecutor {
 		this.controller.addHighlight({ sheet, range, note: input.note });
 		return `ok — highlighted ${input.sheet}!${formatRange(range)}`;
 	}
+}
+
+/**
+ * Compact text sketch of the whole workbook: sheets, used ranges, and cell
+ * contents (small sheets in full, big ones as header row + shape). Used by
+ * the `get_workbook_overview` tool AND auto-attached to every user chat
+ * message so the agent starts each turn with fresh state.
+ */
+export function buildWorkbookOverview(controller: WorkbookController): string {
+	const sheets = controller.sheets();
+	const lines: string[] = [`workbook: ${sheets.length} sheet(s)`];
+	sheets.forEach((sheet, index) => {
+		if (sheet.state !== "visible") return;
+		const used = controller.usedRange(index);
+		if (!used) {
+			lines.push(`\n## ${sheet.name} — empty`);
+			return;
+		}
+		lines.push(`\n## ${sheet.name} — used range ${formatRange(used)}`);
+		if (cellCount(used) <= OVERVIEW_DENSE_CAP) {
+			lines.push(renderGridText(controller, index, used));
+		} else {
+			// Header row + shape hint.
+			const headerRange = { ...used, endRow: used.startRow };
+			lines.push(
+				`row ${used.startRow}: ${renderGridText(controller, index, headerRange)}`,
+			);
+			lines.push(
+				`(${used.endRow - used.startRow} more rows × ${used.endCol - used.startCol + 1} columns — use read_range for details)`,
+			);
+		}
+	});
+	return lines.join("\n");
+}
+
+function renderGridText(
+	controller: WorkbookController,
+	sheet: number,
+	range: CellRange,
+): string {
+	const rows: string[] = [];
+	for (let row = range.startRow; row <= range.endRow; row++) {
+		const cells: string[] = [];
+		for (let col = range.startCol; col <= range.endCol; col++) {
+			const content = controller.cellContent(sheet, row, col);
+			const value = controller.formattedValue(sheet, row, col);
+			if (content.startsWith("=")) cells.push(`${content} ⇒ ${value}`);
+			else cells.push(value);
+		}
+		rows.push(`${row} | ${cells.join("\t")}`);
+	}
+	const header = Array.from({ length: range.endCol - range.startCol + 1 }, (_, i) =>
+		columnToLetters(range.startCol + i),
+	).join("\t");
+	return `  | ${header}\n${rows.join("\n")}`;
 }
 
 /** Normalize a set_cells entry to engine user input; null/'' means "skip". */
