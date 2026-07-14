@@ -4,6 +4,7 @@ import { convertToModelMessages, stepCountIs, streamText } from "ai";
 import { z } from "zod";
 
 import { AGENT_TOOL_DESCRIPTIONS, agentToolSchemas } from "@/lib/agent-tools";
+import { requireApiSession } from "@/lib/session";
 
 export const maxDuration = 120;
 
@@ -29,6 +30,8 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
+	const denied = await requireApiSession();
+	if (denied) return denied;
 	const parsed = bodySchema.safeParse(await request.json());
 	if (!parsed.success) {
 		return Response.json({ error: "invalid body" }, { status: 400 });

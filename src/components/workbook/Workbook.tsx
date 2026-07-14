@@ -4,6 +4,7 @@ import { ArrowLeft, Download, Grid3x3 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { UserMenu } from "@/components/auth/UserMenu";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toaster";
@@ -182,6 +183,7 @@ export function Workbook({ id, name: initialName }: { id: string; name: string }
 						<span className="text-warning">Save failed — retrying</span>
 					)}
 				</span>
+				<UserMenu />
 			</header>
 
 			{controller ? (

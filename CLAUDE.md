@@ -16,11 +16,14 @@ it explains the in-browser engine model and where sheetd will slot in later.
   owner of the model: every read/write from React, keyboard, and agent tools
   goes through it (change notification, autosave dirty-tracking, geometry
   cache, delta echo).
-- The agent chats via `/api/chat` (AI SDK + AI Gateway) but its tools execute
-  **client-side** against the same controller — that's what makes its activity
-  visible live in the grid (presence overlays, pulses, highlights).
-- No auth yet: one shared workspace. Auth/membership arrives later; don't
-  build per-user assumptions into the storage layer meanwhile.
+- The agent chats via `/api/chat` (AI SDK + direct Anthropic API) but its
+  tools execute **client-side** against the same controller — that's what
+  makes its activity visible live in the grid (presence overlays, pulses,
+  highlights).
+- Google sign-in via Better Auth / `@ingram-tech/nk-auth` (`src/lib/auth.ts`,
+  mounted at `/auth`), but still ONE shared workspace — every signed-in user
+  sees every workbook. Don't build per-user assumptions into the storage
+  layer until membership lands.
 
 ## Commands
 

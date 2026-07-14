@@ -33,6 +33,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { toast } from "@/components/ui/toaster";
+import { UserMenu } from "@/components/auth/UserMenu";
 import { ensureIronCalc, Model } from "@/components/workbook/ironcalc";
 import type { WorkbookMeta } from "@/lib/workbooks";
 
@@ -111,10 +112,16 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 				description="AI-native spreadsheets — shared workspace"
 				className="mb-4 border-b-0 px-0 sm:px-0"
 				actions={
-					<Button onClick={() => void createWorkbook()} disabled={creating}>
-						<Plus className="size-4" />
-						{creating ? "Creating…" : "New workbook"}
-					</Button>
+					<>
+						<Button
+							onClick={() => void createWorkbook()}
+							disabled={creating}
+						>
+							<Plus className="size-4" />
+							{creating ? "Creating…" : "New workbook"}
+						</Button>
+						<UserMenu />
+					</>
 				}
 			/>
 

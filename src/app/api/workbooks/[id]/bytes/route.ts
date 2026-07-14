@@ -1,3 +1,4 @@
+import { requireApiSession } from "@/lib/session";
 import { getWorkbookBytes, saveWorkbookBytes } from "@/lib/workbooks";
 
 type Params = { params: Promise<{ id: string }> };
@@ -7,6 +8,8 @@ type Params = { params: Promise<{ id: string }> };
 const MAX_BYTES = 32 * 1024 * 1024;
 
 export async function GET(_request: Request, { params }: Params) {
+	const denied = await requireApiSession();
+	if (denied) return denied;
 	const { id } = await params;
 	const bytes = await getWorkbookBytes(id);
 	if (!bytes) return Response.json({ error: "not found" }, { status: 404 });
@@ -19,6 +22,8 @@ export async function GET(_request: Request, { params }: Params) {
 }
 
 export async function PUT(request: Request, { params }: Params) {
+	const denied = await requireApiSession();
+	if (denied) return denied;
 	const { id } = await params;
 	const body = await request.arrayBuffer();
 	if (body.byteLength === 0) {

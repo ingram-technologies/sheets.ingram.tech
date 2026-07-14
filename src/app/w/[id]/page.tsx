@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { Workbook } from "@/components/workbook/Workbook";
+import { requireUser } from "@/lib/session";
 import { getWorkbookMeta } from "@/lib/workbooks";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,7 @@ export default async function WorkbookPage({
 }: {
 	params: Promise<{ id: string }>;
 }) {
+	await requireUser();
 	const { id } = await params;
 	const meta = await getWorkbookMeta(id);
 	if (!meta) notFound();

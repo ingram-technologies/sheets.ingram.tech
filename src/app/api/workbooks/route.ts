@@ -1,9 +1,12 @@
 import { nanoid } from "nanoid";
 import { z } from "zod";
 
+import { requireApiSession } from "@/lib/session";
 import { createWorkbook, listWorkbooks } from "@/lib/workbooks";
 
 export async function GET() {
+	const denied = await requireApiSession();
+	if (denied) return denied;
 	return Response.json(await listWorkbooks());
 }
 
@@ -14,6 +17,8 @@ const createSchema = z.object({
 });
 
 export async function POST(request: Request) {
+	const denied = await requireApiSession();
+	if (denied) return denied;
 	const parsed = createSchema.safeParse(await request.json());
 	if (!parsed.success) {
 		return Response.json({ error: z.treeifyError(parsed.error) }, { status: 400 });

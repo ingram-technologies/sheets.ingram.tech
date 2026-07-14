@@ -86,7 +86,12 @@ Ingram RDS instance (see the `sheets` stack in the infra repo).
 
 ## What is deliberately NOT here yet
 
-- **Auth / membership** — one common workspace; Better-Auth later.
+- **Membership / per-user workspaces** — sign-in exists (Better Auth via
+  `@ingram-tech/nk-auth`, Google-only, mounted at `/auth`; see `src/lib/auth.ts`)
+  but every signed-in user still shares ONE workspace — no ownership columns,
+  no sharing model. Sign-in also (optionally, via Google's granular consent)
+  requests the `spreadsheets` scope and stores a refresh token in the
+  `account` table for future Google Sheets import/export.
 - **sheetd + realtime channel** — single-client editing only; the engine diff
   queue (`flushSendQueue`/`applyExternalDiffs`) is unused until then.
 - **xlsx/csv import-export, gsheets** — arrive with sheetd (server-side
