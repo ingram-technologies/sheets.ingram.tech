@@ -35,6 +35,12 @@ function DialogContent({ className, children, ...props }: DialogPrimitive.Popup.
 				data-slot="dialog-content"
 				className={cn(
 					"fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 sm:rounded-lg",
+					// Local delta from the registry, which sets no max height.
+					// Because the popup is centred with translate(-50%,-50%),
+					// content taller than the viewport overflows BOTH edges at
+					// once and takes the title and close button off-screen with
+					// no way to scroll to them. Upstream candidate.
+					"max-h-[calc(100dvh-2rem)] overflow-y-auto",
 					className,
 				)}
 				{...props}

@@ -161,10 +161,13 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 								<TableCell className="p-0">
 									<Link
 										href={`/w/${workbook.id}`}
-										className="flex items-center gap-2.5 px-2 py-3 font-medium"
+										title={workbook.name}
+										className="flex items-center gap-2.5 rounded-sm px-2 py-3 font-medium"
 									>
-										<FileSpreadsheet className="size-4 text-muted-foreground" />
-										{workbook.name}
+										<FileSpreadsheet className="size-4 shrink-0 text-muted-foreground" />
+										<span className="truncate">
+											{workbook.name}
+										</span>
 									</Link>
 								</TableCell>
 								<TableCell
@@ -267,7 +270,7 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 					description={
 						<>
 							This permanently deletes <strong>{deleting.name}</strong>{" "}
-							and its contents for everyone in the workspace.
+							and everything in it. This can&apos;t be undone.
 						</>
 					}
 					onClose={() => setDeleting(null)}

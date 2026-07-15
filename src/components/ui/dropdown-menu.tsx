@@ -65,8 +65,13 @@ function DropdownMenuItem({
 			data-variant={variant}
 			className={cn(
 				"relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+				// Local delta from the registry, which uses `text-destructive`
+				// here. That token is the oxblood FILL and measures 1.81:1 as
+				// text on the charcoal popover — unreadable. `-ink` is the
+				// text-on-dark tone (4.52:1). Upstream candidate; see the
+				// destructive block in globals.css.
 				variant === "destructive" &&
-					"text-destructive data-highlighted:bg-destructive/10 data-highlighted:text-destructive [&_svg]:text-destructive",
+					"text-destructive-ink data-highlighted:bg-destructive-ink/10 data-highlighted:text-destructive-ink [&_svg]:text-destructive-ink",
 				inset && "pl-8",
 				className,
 			)}

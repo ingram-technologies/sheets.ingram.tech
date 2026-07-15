@@ -1,10 +1,11 @@
 "use client";
 
 import {
-	ExternalLink,
+	Download,
 	FileSpreadsheet,
 	FolderSearch,
 	Link2,
+	Loader2,
 	Search,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -224,7 +225,14 @@ export function OpenFromGoogle() {
 						/>
 					</div>
 
-					<div className="min-h-48 overflow-y-auto rounded-md border border-border">
+					{/* max-h, not just min-h: without a ceiling a long result
+					    list grew the dialog past the viewport. */}
+					<div
+						role="listbox"
+						aria-label="Search results"
+						aria-busy={searching}
+						className="max-h-64 min-h-48 overflow-y-auto rounded-md border border-border"
+					>
 						{scopeMissing ? (
 							<ScopePrompt />
 						) : linkedId ? (
@@ -274,8 +282,15 @@ export function OpenFromGoogle() {
 						) : (
 							<span />
 						)}
+						{/* Import runs wasm + two network round-trips with the
+						    dialog locked shut; an 11px word was the only sign
+						    anything was happening. */}
 						{importing ? (
-							<span className="text-xs text-muted-foreground">
+							<span
+								className="flex items-center gap-1.5 text-xs text-muted-foreground"
+								role="status"
+							>
+								<Loader2 className="size-3 animate-spin" />
 								Importing…
 							</span>
 						) : null}
@@ -302,9 +317,14 @@ function ResultRow({
 	return (
 		<button
 			type="button"
+			role="option"
+			aria-selected={false}
 			disabled={disabled}
 			onClick={onClick}
-			className="flex w-full items-center gap-2.5 border-b border-border px-3 py-2.5 text-left last:border-b-0 hover:bg-accent/50 disabled:opacity-50"
+			title={title}
+			// focus-visible was missing entirely — the list was keyboard-
+			// reachable but gave no sign of where you were.
+			className="flex w-full items-center gap-2.5 border-b border-border px-3 py-2.5 text-left last:border-b-0 hover:bg-accent/50 focus-visible:bg-accent focus-visible:outline-none disabled:opacity-50"
 		>
 			<Icon className="size-4 shrink-0 text-muted-foreground" />
 			<span className="min-w-0 flex-1 truncate text-sm">{title}</span>
@@ -313,7 +333,9 @@ function ResultRow({
 					{subtitle}
 				</span>
 			) : null}
-			<ExternalLink className="size-3.5 shrink-0 text-muted-foreground/50" />
+			{/* The ExternalLink icon that used to sit here was backwards: these
+			    rows import INTO this app, they don't open anything externally. */}
+			<Download className="size-3.5 shrink-0 text-muted-foreground" />
 		</button>
 	);
 }

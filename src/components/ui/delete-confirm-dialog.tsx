@@ -96,7 +96,14 @@ export function DeleteConfirmDialog({
 						disabled={pending}
 					/>
 
-					{error ? <p className="text-destructive text-sm">{error}</p> : null}
+					{/* `-ink`, not `text-destructive`: the latter is the oxblood
+					    fill and is unreadable as text on charcoal. Local delta
+					    from the registry; see globals.css. */}
+					{error ? (
+						<p className="text-destructive-ink text-sm" role="alert">
+							{error}
+						</p>
+					) : null}
 				</div>
 
 				<DialogFooter>

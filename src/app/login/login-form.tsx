@@ -1,26 +1,56 @@
 "use client";
 
-import { useState } from "react";
+import { Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 import { SheetsMark } from "@/components/brand/sheets-mark";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/components/ui/toaster";
 import { authClient } from "@/lib/auth-client";
+
+// If the handoff to Google hasn't navigated away by now, something is wrong
+// (blocked popup, offline, bfcache restore). Give the button back rather than
+// leaving "Redirecting…" disabled forever.
+const REDIRECT_TIMEOUT_MS = 8000;
 
 export function LoginForm({ next }: { next: string }) {
 	const [pending, setPending] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	useEffect(() => {
+		// Returning via the back button restores this page from bfcache with
+		// `pending` still true and the button dead. Reset on restore.
+		const onPageShow = (event: PageTransitionEvent) => {
+			if (event.persisted) setPending(false);
+		};
+		window.addEventListener("pageshow", onPageShow);
+		return () => {
+			window.removeEventListener("pageshow", onPageShow);
+			if (timer.current) clearTimeout(timer.current);
+		};
+	}, []);
 
 	const signIn = async () => {
 		setPending(true);
-		const { error } = await authClient.signIn.social({
-			provider: "google",
-			callbackURL: next,
-		});
-		if (error) {
-			toast.error(error.message ?? "Sign-in failed");
+		setError(null);
+		timer.current = setTimeout(() => {
 			setPending(false);
+			setError("That took too long. Check your connection and try again.");
+		}, REDIRECT_TIMEOUT_MS);
+		try {
+			const { error: signInError } = await authClient.signIn.social({
+				provider: "google",
+				callbackURL: next,
+			});
+			if (signInError) throw new Error(signInError.message ?? "Sign-in failed");
+			// On success the browser navigates to Google; keep pending until then.
+		} catch (caught) {
+			if (timer.current) clearTimeout(timer.current);
+			setPending(false);
+			// Inline, not a toast: this is the one screen where the failure IS
+			// the content, and a toast that fades leaves a dead end.
+			setError(caught instanceof Error ? caught.message : "Sign-in failed");
 		}
-		// On success the browser navigates to Google; keep the pending state.
 	};
 
 	return (
@@ -30,25 +60,45 @@ export function LoginForm({ next }: { next: string }) {
 					<div className="mx-auto flex size-10 items-center justify-center rounded-lg bg-primary/10">
 						<SheetsMark className="size-5 text-primary" />
 					</div>
-					<h1 className="text-lg font-semibold">Ingram Sheets</h1>
+					<h1 className="text-xl font-semibold">Ingram Sheets</h1>
 					<p className="text-sm text-muted-foreground">
 						AI-native spreadsheets
 					</p>
 				</div>
-				<Button
-					variant="outline"
-					className="w-full"
-					disabled={pending}
-					onClick={() => void signIn()}
-				>
-					<GoogleIcon />
-					{pending ? "Redirecting…" : "Continue with Google"}
-				</Button>
+				<div className="space-y-3">
+					<Button
+						variant="outline"
+						className="w-full"
+						disabled={pending}
+						aria-busy={pending}
+						onClick={() => void signIn()}
+					>
+						{pending ? (
+							<Loader2 className="size-4 animate-spin" />
+						) : (
+							<GoogleIcon />
+						)}
+						{pending ? "Redirecting…" : "Continue with Google"}
+					</Button>
+					{error ? (
+						<p
+							className="text-center text-sm text-destructive-ink"
+							role="alert"
+						>
+							{error}
+						</p>
+					) : null}
+				</div>
 			</div>
 		</main>
 	);
 }
 
+/**
+ * Google's four brand hexes are mandated by their branding guidelines and must
+ * not be tokenised — this is the one place in the app where a hardcoded colour
+ * is correct.
+ */
 function GoogleIcon() {
 	return (
 		<svg className="size-4" viewBox="0 0 24 24" aria-hidden="true">
