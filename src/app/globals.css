@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Streamdown ships Tailwind classes in its own dist; v4 only generates classes
+ * it can see, so the chat panel's markdown renders unstyled without this. */
+@source "../../node_modules/streamdown/dist";
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
@@ -10,14 +14,22 @@
 	--popover: oklch(1 0 0);
 	--popover-foreground: oklch(0.2264 0 0);
 	--primary: oklch(0.6846 0.2042 24.2803);
-	--primary-foreground: oklch(0.985 0 0);
+	/* Charcoal ink on the coral fill: 5.48:1 (AA). Paper-on-coral, which the
+	 * brand DESIGN.md specifies, measures 3.11:1 and fails AA for button text
+	 * — the fill stays exactly brand coral, only the label darkens. */
+	--primary-foreground: oklch(0.2264 0 0);
 	--secondary: oklch(0.9702 0 0);
 	--secondary-foreground: oklch(0.205 0 0);
 	--muted: oklch(0.9702 0 0);
 	--muted-foreground: oklch(0.5555 0 0);
 	--accent: oklch(0.9702 0 0);
 	--accent-foreground: oklch(0.205 0 0);
-	--destructive: oklch(0.6846 0.2042 24.2803);
+	/* Brand "Coral Deep" — the one palette entry that is unmistakably NOT the
+	 * coral CTA (L 0.44 vs 0.68), so Delete can never wear the primary
+	 * action's clothes. White on it is 7.99:1. It is a FILL only: as text it
+	 * measures 1.81:1, so `text-destructive` is never used — destructive menu
+	 * items carry ink text and take the oxblood as a hover/focus fill. */
+	--destructive: oklch(0.44 0.14 27);
 	--destructive-foreground: oklch(0.985 0 0);
 	--success: oklch(0.62 0.17 150);
 	--success-foreground: oklch(0.985 0 0);
@@ -50,14 +62,16 @@
 	--popover: oklch(0.2686 0 0);
 	--popover-foreground: oklch(0.9702 0 0);
 	--primary: oklch(0.6846 0.2042 24.2803);
-	--primary-foreground: oklch(0.985 0 0);
+	/* See :root — charcoal ink on coral, 5.48:1. */
+	--primary-foreground: oklch(0.2264 0 0);
 	--secondary: oklch(0.3211 0 0);
 	--secondary-foreground: oklch(0.9702 0 0);
 	--muted: oklch(0.3211 0 0);
 	--muted-foreground: oklch(0.7155 0 0);
 	--accent: oklch(0.3211 0 0);
 	--accent-foreground: oklch(0.9702 0 0);
-	--destructive: oklch(0.6846 0.2042 24.2803);
+	/* See :root — brand Coral Deep, fill-only, white text 7.99:1. */
+	--destructive: oklch(0.44 0.14 27);
 	--destructive-foreground: oklch(0.985 0 0);
 	--success: oklch(0.7 0.16 150);
 	--success-foreground: oklch(0.2264 0 0);
@@ -90,8 +104,14 @@
  * (IronCalc's default font color is black), so a dark canvas would render
  * black-on-grey. No `.dark` overrides here on purpose. The user's selection
  * is classic spreadsheet blue; the agent's presence is violet so human and
- * machine cursors are never confusable (primary red stays reserved for
+ * machine cursors are never confusable (primary coral stays reserved for
  * destructive/brand accents).
+ *
+ * The agent colour exists in TWO tones because it appears on two grounds.
+ * `--sheet-agent` is tuned for the white canvas (4.9:1 there); the same value
+ * as text on charcoal chrome measures only 3.32:1, which fails AA at the
+ * 11-12px the chat panel uses. `--agent-ink` is the charcoal-ground tone
+ * (4.5:1+). Never swap them: each fails on the other's background.
  */
 :root,
 .dark {
@@ -101,15 +121,65 @@
 	--sheet-header-bg: oklch(0.9802 0 0);
 	--sheet-header-fg: oklch(0.5555 0 0);
 	--sheet-header-active-bg: oklch(0.9219 0 0);
+	/* On white paper: 4.97:1 — well past the 3:1 non-text bar for outlines. */
 	--sheet-selection: oklch(0.5461 0.153 253.71);
 	--sheet-selection-bg: oklch(0.5461 0.153 253.71 / 8%);
 	--sheet-agent: oklch(0.5575 0.2 293.85);
 	--sheet-agent-bg: oklch(0.5575 0.2 293.85 / 10%);
 	--sheet-pulse: oklch(0.78 0.16 80 / 35%);
-	--sheet-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+	--sheet-font:
+		var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+/* Agent violet for the charcoal chrome (chat panel, status chips). */
+:root,
+.dark {
+	--agent-ink: oklch(0.66 0.16 293.85);
+	--agent-ink-bg: oklch(0.66 0.16 293.85 / 12%);
+}
+
+/*
+ * Destructive needs two tones on a dark ground, and no single value can serve
+ * both roles: a fill dark enough to be unmistakably NOT the coral CTA is
+ * illegible as text (oxblood as text = 1.81:1), while a red light enough to
+ * read as text on charcoal lands right back on coral and re-creates the
+ * "Delete looks like the primary action" hazard.
+ *
+ * So: `--destructive` is the FILL (brand Coral Deep, white text 7.99:1) and
+ * `--destructive-ink` is TEXT on charcoal (4.52:1 on surface, 5.09:1 on base)
+ * — shifted to rose so an error never reads as a brand accent.
+ *
+ * The shared registry assumes one token in both roles (`bg-destructive` in
+ * button/badge, `text-destructive` in dropdown-menu/delete-confirm-dialog),
+ * which is a latent dark-theme bug there. dropdown-menu.tsx and
+ * delete-confirm-dialog.tsx carry a deliberate local delta for this; both are
+ * upstream candidates alongside the existing page-header superset.
+ */
+:root,
+.dark {
+	--destructive-ink: oklch(0.665 0.19 12);
 }
 
 @theme inline {
+	/* Inter is the brand family (ingram.tech DESIGN.md: one family, worked hard
+	 * across weights). `--font-inter` is injected by next/font in layout.tsx. */
+	--font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+	--font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+	--color-agent: var(--agent-ink);
+	--color-agent-bg: var(--agent-ink-bg);
+	--color-destructive-ink: var(--destructive-ink);
+
+	/* Semantic z-index scale. Before this, CellEditor and the Grid selection
+	 * overlay both sat at z-10 and resolved by source order. */
+	--z-grid-overlay: 10;
+	--z-cell-editor: 20;
+	--z-sticky: 30;
+	--z-dropdown: 40;
+	--z-modal: 50;
+	--z-toast: 60;
+	--z-tooltip: 70;
+
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	--color-card: var(--card);
@@ -153,4 +223,38 @@
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
+}
+
+/*
+ * Reduced motion. This app animates state, never decoration: the agent's cell
+ * pulses, the chat spinner, dialog/dropdown entrances. Users who ask for less
+ * motion still need every one of those *states* — so this collapses duration
+ * to a hair rather than removing the transition, which would also disable the
+ * `animate-in` fade that dialogs rely on to become visible at all.
+ *
+ * The canvas pulse is driven by JS (renderer.ts), not CSS, so it honours this
+ * via a matchMedia check in the controller rather than through this rule.
+ */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}
+
+@layer base {
+	/*
+	 * Spreadsheet chrome is dense and keyboard-first: a visible focus ring is
+	 * the difference between usable and unusable. Base UI primitives ship
+	 * their own `focus-visible` styles; this covers the hand-rolled controls
+	 * (sheet tabs, swatches, the avatar trigger) so none can regress silently.
+	 */
+	:focus-visible {
+		outline: 2px solid var(--ring);
+		outline-offset: 2px;
+	}
 }
