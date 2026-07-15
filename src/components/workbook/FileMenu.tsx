@@ -1,10 +1,18 @@
 "use client";
 
-import { ChevronDown, ExternalLink, FileDown, FileUp } from "lucide-react";
+import { ChevronDown, ExternalLink, FileDown, FileUp, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -34,6 +42,7 @@ export function FileMenu({
 	initialGoogleSpreadsheetId: string | null;
 }) {
 	const [busy, setBusy] = useState(false);
+	const [confirmOverwrite, setConfirmOverwrite] = useState(false);
 	const [googleId, setGoogleId] = useState(initialGoogleSpreadsheetId);
 
 	const saveToGoogle = async () => {
@@ -99,42 +108,94 @@ export function FileMenu({
 	};
 
 	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger
-				render={
-					<Button
-						variant="ghost"
-						size="sm"
-						className="h-7 gap-1 px-2 text-muted-foreground"
-						disabled={!controller || busy}
-					>
-						File
-						<ChevronDown className="size-3.5" />
-					</Button>
-				}
-			/>
-			<DropdownMenuContent align="start" className="min-w-56">
-				<DropdownMenuItem onClick={() => void saveToGoogle()}>
-					<FileUp className="size-4" />
-					{googleId ? "Save to linked Google Sheet" : "Save to Google Sheets"}
-				</DropdownMenuItem>
-				{googleId ? (
+		<>
+			<DropdownMenu>
+				<DropdownMenuTrigger
+					render={
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-7 gap-1 px-2 text-muted-foreground"
+							disabled={!controller || busy}
+						>
+							{/* The trigger merely went disabled while a multi-second
+						    export ran, with the label still reading "File" —
+						    indistinguishable from dead UI. */}
+							{busy ? (
+								<Loader2 className="size-3.5 animate-spin" />
+							) : null}
+							{busy ? "Working…" : "File"}
+							{busy ? null : <ChevronDown className="size-3.5" />}
+						</Button>
+					}
+				/>
+				<DropdownMenuContent align="start" className="min-w-56">
 					<DropdownMenuItem
-						onClick={() =>
-							window.open(spreadsheetUrl(googleId), "_blank", "noopener")
-						}
+						onClick={() => {
+							// Re-saving full-replaces the linked spreadsheet. Doing
+							// that to a live Google doc deserves a confirmation; the
+							// first save creates a new one and doesn't.
+							if (googleId) setConfirmOverwrite(true);
+							else void saveToGoogle();
+						}}
 					>
-						<ExternalLink className="size-4" />
-						Open in Google Sheets
+						<FileUp className="size-4" />
+						{googleId
+							? "Save to linked Google Sheet"
+							: "Save to Google Sheets"}
 					</DropdownMenuItem>
-				) : null}
-				<DropdownMenuSeparator />
-				<DropdownMenuItem onClick={() => void downloadXlsx()}>
-					<FileDown className="size-4" />
-					Download as Excel (.xlsx)
-				</DropdownMenuItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
+					{googleId ? (
+						<DropdownMenuItem
+							onClick={() =>
+								window.open(
+									spreadsheetUrl(googleId),
+									"_blank",
+									"noopener",
+								)
+							}
+						>
+							<ExternalLink className="size-4" />
+							Open in Google Sheets
+						</DropdownMenuItem>
+					) : null}
+					<DropdownMenuSeparator />
+					<DropdownMenuItem onClick={() => void downloadXlsx()}>
+						<FileDown className="size-4" />
+						Download as Excel (.xlsx)
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
+
+			<Dialog open={confirmOverwrite} onOpenChange={setConfirmOverwrite}>
+				<DialogContent className="max-w-sm">
+					<DialogHeader>
+						<DialogTitle>Replace the linked Google Sheet?</DialogTitle>
+						<DialogDescription>
+							This replaces everything in the linked spreadsheet with this
+							workbook&apos;s contents. Any edits made in Google Sheets
+							since the last save will be lost.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<Button
+							variant="ghost"
+							onClick={() => setConfirmOverwrite(false)}
+						>
+							Cancel
+						</Button>
+						<Button
+							variant="destructive"
+							onClick={() => {
+								setConfirmOverwrite(false);
+								void saveToGoogle();
+							}}
+						>
+							Replace
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</>
 	);
 }
 
