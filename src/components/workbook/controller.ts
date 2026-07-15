@@ -9,6 +9,18 @@ import type {
 import type { CellRange } from "@/lib/a1";
 import { cellCount, formatCell, parseCell } from "@/lib/a1";
 
+/**
+ * Engine cell types, on Excel's TYPE() numbering. The wasm typings return a
+ * bare `number` and export no enum, so these values are pinned by
+ * cell-stats.test.ts against the vendored build rather than assumed.
+ */
+export enum CellType {
+	Number = 1,
+	Text = 2,
+	Logical = 4,
+	Error = 16,
+}
+
 /** One computed-value change observed across a mutation (the delta echo). */
 export interface CellChange {
 	sheet: number;
@@ -172,6 +184,23 @@ export class WorkbookController {
 
 	formattedValue(sheet: number, row: number, col: number): string {
 		return this.model.getFormattedCellValue(sheet, row, col);
+	}
+
+	/**
+	 * The engine's cell type, on Excel's TYPE() numbering (verified against the
+	 * pinned build in cell-stats.test.ts, since the wasm typings expose this as
+	 * a bare `number` with no enum).
+	 *
+	 * This is the only trustworthy way to ask "is this cell actually a number?".
+	 * Do not infer it from the formatted string: IronCalc stores "(1234)" and
+	 * "€1.000,12" as TEXT, and both survive a naive numeric regex as bogus
+	 * values.
+	 */
+	cellType(sheet: number, row: number, col: number): CellType {
+		const type = this.model.getCellType(sheet, row, col);
+		return type === 1 || type === 2 || type === 4 || type === 16
+			? type
+			: CellType.Text;
 	}
 
 	cellStyle(sheet: number, row: number, col: number): CellStyle {

@@ -4,13 +4,18 @@ import { useSyncExternalStore } from "react";
 
 import { cellCount, formatRange } from "@/lib/a1";
 
+import { selectionStats } from "./cell-stats";
 import type { WorkbookController } from "./controller";
 
+// Above this, per-cell engine calls would stall the UI on every selection
+// change. Hitting it says so rather than making the stats silently vanish.
 const STATS_CELL_CAP = 10000;
 
 /**
- * Bottom strip: selection reference + quick stats (sum/avg/count of numeric
- * cells in the selection), spreadsheet-style.
+ * Bottom strip: selection reference + quick stats, spreadsheet-style.
+ *
+ * The arithmetic lives in cell-stats.ts and is deliberately conservative — it
+ * skips any cell whose value can't be recovered exactly rather than guessing.
  */
 export function StatusBar({ controller }: { controller: WorkbookController }) {
 	useSyncExternalStore(
@@ -27,37 +32,45 @@ export function StatusBar({ controller }: { controller: WorkbookController }) {
 		endCol: Math.max(view.range[1], view.range[3]),
 	};
 
-	let stats: { sum: number; count: number; filled: number } | null = null;
-	if (cellCount(range) > 1 && cellCount(range) <= STATS_CELL_CAP) {
-		let sum = 0;
-		let count = 0;
-		let filled = 0;
-		for (let row = range.startRow; row <= range.endRow; row++) {
-			for (let col = range.startCol; col <= range.endCol; col++) {
-				const value = controller.formattedValue(view.sheet, row, col);
-				if (value === "") continue;
-				filled += 1;
-				const numeric = Number(value.replace(/[^0-9.eE+-]/g, ""));
-				if (value.match(/\d/) && Number.isFinite(numeric)) {
-					sum += numeric;
-					count += 1;
-				}
-			}
-		}
-		if (filled > 0) stats = { sum, count, filled };
-	}
+	const size = cellCount(range);
+	const overCap = size > STATS_CELL_CAP;
+	const stats =
+		size > 1 && !overCap ? selectionStats(controller, view.sheet, range) : null;
 
 	const format = (n: number) =>
-		new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(n);
+		// Undefined locale = the reader's own. This is chrome, not cell content.
+		new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(n);
 
 	return (
-		<div className="flex h-6 shrink-0 items-center gap-4 border-t border-border bg-background px-3 text-[11px] text-muted-foreground">
+		<div
+			className="flex h-6 shrink-0 items-center gap-4 border-t border-border bg-background px-3 text-[11px] text-muted-foreground"
+			// Spreadsheet users read the sum by glancing; a screen reader user
+			// needs it announced when the selection settles. Polite, so it never
+			// interrupts navigation.
+			aria-live="polite"
+			aria-atomic="true"
+		>
 			<span className="font-mono">{formatRange(range)}</span>
-			{stats && stats.count > 0 ? (
+
+			{overCap ? (
+				<span>Selection too large for stats</span>
+			) : stats && stats.filled > 0 ? (
 				<>
-					<span>Sum {format(stats.sum)}</span>
-					<span>Avg {format(stats.sum / stats.count)}</span>
+					{stats.numeric > 0 ? (
+						<>
+							<span>Sum {format(stats.sum)}</span>
+							<span>Avg {format(stats.sum / stats.numeric)}</span>
+						</>
+					) : null}
+					{/* Count reports every non-empty cell, so a text-only
+					    selection still answers "how many?" rather than showing
+					    nothing at all. */}
 					<span>Count {stats.filled}</span>
+					{stats.skipped > 0 ? (
+						<span title="Dates and values the engine can't express as a plain number are left out of Sum and Avg.">
+							{stats.skipped} not counted
+						</span>
+					) : null}
 				</>
 			) : null}
 		</div>
