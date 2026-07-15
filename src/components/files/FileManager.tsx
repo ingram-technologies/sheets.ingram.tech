@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState } from "react";
 
+import { SheetsMark } from "@/components/brand/sheets-mark";
 import { Button } from "@/components/ui/button";
 import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import {
@@ -109,9 +110,10 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 	return (
 		<main className="mx-auto w-full max-w-4xl px-6 py-10">
 			<PageHeader
-				icon={FileSpreadsheet}
-				title="Sheets"
-				description="AI-native spreadsheets — shared workspace"
+				icon={SheetsMark}
+				iconClassName="bg-primary/10 text-primary"
+				title="Ingram Sheets"
+				description="AI-native spreadsheets"
 				className="mb-4 border-b-0 px-0 sm:px-0"
 				actions={
 					<>

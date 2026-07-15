@@ -6,8 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
 export const metadata: Metadata = {
-	title: { default: "Sheets", template: "%s · Sheets" },
-	description: "AI-native collaborative spreadsheets",
+	title: { default: "Ingram Sheets", template: "%s · Ingram Sheets" },
+	description: "AI-native spreadsheets",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

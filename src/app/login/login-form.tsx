@@ -1,8 +1,8 @@
 "use client";
 
-import { Grid3x3 } from "lucide-react";
 import { useState } from "react";
 
+import { SheetsMark } from "@/components/brand/sheets-mark";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toaster";
 import { authClient } from "@/lib/auth-client";
@@ -28,11 +28,11 @@ export function LoginForm({ next }: { next: string }) {
 			<div className="w-full max-w-sm space-y-8">
 				<div className="space-y-2 text-center">
 					<div className="mx-auto flex size-10 items-center justify-center rounded-lg bg-primary/10">
-						<Grid3x3 className="size-5 text-primary" />
+						<SheetsMark className="size-5 text-primary" />
 					</div>
-					<h1 className="text-lg font-semibold">Sheets</h1>
+					<h1 className="text-lg font-semibold">Ingram Sheets</h1>
 					<p className="text-sm text-muted-foreground">
-						AI-native collaborative spreadsheets
+						AI-native spreadsheets
 					</p>
 				</div>
 				<Button

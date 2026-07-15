@@ -1,4 +1,3 @@
-import type { LucideIcon } from "lucide-react";
 import type * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -13,13 +12,17 @@ export function PageHeader({
 	title,
 	description,
 	icon: Icon,
+	iconClassName,
 	start,
 	actions,
 	className,
 }: {
 	title: string;
 	description?: string;
-	icon?: LucideIcon;
+	/** Any glyph that colours itself from `currentColor` — Lucide or a brand mark. */
+	icon?: React.ComponentType<{ className?: string }>;
+	/** Restyle the icon chip, e.g. `bg-primary/10 text-primary` to brand it. */
+	iconClassName?: string;
 	/** Leading slot before the title, e.g. a mobile-nav trigger. */
 	start?: React.ReactNode;
 	/** Trailing slot: page-level actions, docs links, filters. */
@@ -37,7 +40,12 @@ export function PageHeader({
 			<div className="flex min-w-0 items-center gap-3">
 				{start}
 				{Icon ? (
-					<div className="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-md">
+					<div
+						className={cn(
+							"bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-md",
+							iconClassName,
+						)}
+					>
 						<Icon className="size-4" />
 					</div>
 				) : null}
