@@ -5,8 +5,21 @@ AI-native collaborative spreadsheets. The spreadsheet engine
 in the same workbook through chat, and you watch it work — live cursor,
 change pulses, highlights.
 
-Private product UI of the Sheets project; the open-source engine toolkit
-lives at [ingram-technologies/sheetkit](https://github.com/ingram-technologies/sheetkit).
+Private product UI of the Sheets project.
+
+## Docs
+
+- [`docs/architecture.md`](./docs/architecture.md) — how the system is shaped and
+  why: the in-browser IronCalc engine, the `WorkbookController` model, the
+  client-side agent loop, the Google Sheets bridge, and what is deliberately not
+  built yet.
+- [`docs/engine-constraints.md`](./docs/engine-constraints.md) — the IronCalc
+  facts behind those choices: why the engine is vendored and pinned, why stored
+  bytes are opaque and version-locked, why the delta echo is a brute-force
+  snapshot diff, and why presence is our own protocol.
+- [ingram-technologies/sheetkit](https://github.com/ingram-technologies/sheetkit)
+  — the OSS engine half: sheetd, the MCP tool surface, and the
+  `sheets.channel.v1` channel-protocol spec this app will speak.
 
 ## Develop
 
@@ -15,10 +28,10 @@ bun install
 bun run dev     # PGlite (no Docker) + migrations + next dev on :3000
 ```
 
-Chat needs `ANTHROPIC_API_KEY` and Google sign-in needs
-`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` locally (e.g. via `vercel env pull`);
-everything else works without env. See
-[`docs/architecture.md`](./docs/architecture.md).
+Google sign-in gates every page, so `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`
+are required to use the app at all; `ANTHROPIC_API_KEY` is needed only for the
+agent chat. Get both from `vercel env pull`. Nothing else needs configuring
+locally — `bun run dev` boots its own database.
 
 ## Env
 

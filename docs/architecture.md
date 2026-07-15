@@ -1,26 +1,41 @@
 # Architecture
 
-sheets.ingram.tech is the private product UI from the Sheets plan
-(`~/src/sheets-plan.md` §6): an AI-native collaborative spreadsheet. This
-initial version is **browser-engine only** — no sheetd, no auth — but is
-shaped so the sheetd/channel wiring (plan §8) slots in without rework.
+sheets.ingram.tech is the private product UI: an AI-native collaborative
+spreadsheet. The engine runs in the browser and there is no sheetd yet — single
+-client editing only — but the app is shaped so the sheetd/channel wiring slots
+in without rework.
+
+The OSS engine half (sheetd, the MCP tool surface, the channel protocol spec)
+lives in the public [sheetkit](https://github.com/ingram-technologies/sheetkit)
+repo. [`engine-constraints.md`](./engine-constraints.md) explains the IronCalc
+facts that force several of the choices below.
+
+## Why this shape
+
+Every existing spreadsheet interface for an LLM loses the three things that make
+a spreadsheet usable for a human: random-access vision, instant recalc feedback,
+and spatial addressing. This product rebuilds them as text:
+
+- a **compressed, structure-aware read encoding** — the agent gets a sketch of
+  regions, headers, dtypes and fills, not a cell dump;
+- a **dependency-aware delta echo** after every mutation — the agent learns the
+  full ripple, including formula recalc, from the write itself;
+- **range-level verbs** (fill, sort, format) instead of cell-by-cell APIs.
+
+The delta echo is the load-bearing one: it is why the agent never re-reads a
+range to learn what its own edit did. Everything below serves that.
+
+The same engine model also powers a human UI where the agent's activity is
+*visible* — live highlights, selections, and per-cell pointing between user and
+agent. That visibility is the product, not decoration.
 
 ## The engine runs in the browser
 
 `@ironcalc/wasm` provides the full IronCalc `UserModel`: formula evaluation,
 undo/redo, styles, number formats, fills, clipboard, and per-sheet view state
-(selection, scroll anchor). The wasm binary is copied to `public/ironcalc/`
-by `scripts/copy-wasm.ts` (predev / prebuild) and fetched once per page.
-
-The package is **vendored at `vendor/ironcalc-wasm/`** (a `file:` dependency),
-built from the same pinned git revision of upstream IronCalc that sheetkit
-uses — see the rev in the vendored `package.json` version and sheetkit's
-workspace `Cargo.toml`. The published npm release lags main by ~150 functions
-(SUMPRODUCT, FILTER, SORT, UNIQUE, LET, LAMBDA, …) and the dynamic-array
-engine, which users hit immediately. To rebuild: check out the rev in the
-IronCalc repo, `make all` in `bindings/wasm` (needs `wasm-pack` and a
-TypeScript for the `types.ts` step), copy `pkg/` here, delete its
-`.gitignore`, and set the rev-suffixed version.
+(selection, scroll anchor). It is vendored and pinned to a specific upstream git
+rev — see [`engine-constraints.md`](./engine-constraints.md) for the rev, the
+rebuild recipe, and why the published npm release isn't usable.
 
 The server stores workbooks as **opaque engine bytes** (`Model.toBytes()`,
 IronCalc's bitcode format) in a Postgres `bytea` column. Creating a workbook
@@ -28,109 +43,164 @@ happens client-side too: the browser builds an empty model and uploads its
 bytes. Consequences:
 
 - the server has no spreadsheet logic and no wasm dependency;
-- the bytes format is version-locked to the pinned `@ironcalc/wasm` — bump it
-  deliberately. This is NOT theoretical: the 0.7.0 → git-main bump broke
-  decoding (verified — "invalid packing"), and the UI shows a clear
-  "saved by an older engine" error for such blobs. Migrate through xlsx
-  before bumping if the stored workbooks matter;
-- when sheetd (the server-side engine, from the public sheetkit repo) arrives,
-  it speaks the same format, and the blob store moves behind it.
+- the bytes format is version-locked to the pinned engine — bumping it is a
+  protocol break, not an upgrade (see `engine-constraints.md`);
+- when sheetd arrives it speaks the same format, and the blob store moves behind
+  it.
 
 ## WorkbookController — the one door to the model
 
 `src/components/workbook/controller.ts`. Everything goes through it:
 
-- `mutate(fn, pulse?)` — content changes. Snapshots the sheet's computed
-  values before/after (bounded by `SNAPSHOT_CELL_CAP`) and returns the **delta
-  echo**: every cell whose computed value changed, including formula ripple.
-  Bumps the version (→ `useSyncExternalStore` subscribers redraw), fires
-  dirty listeners (→ autosave), pulses changed cells on the canvas.
+- `mutate(fn, pulse?)` — content changes. Snapshots the sheet's computed values
+  before/after (bounded by `SNAPSHOT_CELL_CAP`) and returns the **delta echo**:
+  every cell whose computed value changed, including formula ripple. Bumps the
+  version (→ `useSyncExternalStore` subscribers redraw), fires dirty listeners
+  (→ autosave), pulses changed cells on the canvas. The snapshot-diff is brute
+  force because IronCalc exposes no dependents API — see
+  [`engine-constraints.md`](./engine-constraints.md) before touching the cap.
 - `view(fn)` — selection/scroll/sheet-switch; no autosave, no snapshot.
 - geometry cache — prefix-summed row/col offsets per sheet for O(log n)
   pixel↔cell mapping; invalidated on every mutation; virtual extent grows as
   you scroll (`extendExtent`).
-- presence — agent status, highlights (range + note), and cell pulses live
-  here, so grid overlays and the chat panel share one source of truth. This
-  is the client-side twin of the `sheets.channel.v1` presence frames; when
-  the websocket channel lands, these fields get fed from it instead.
+- presence — agent status, highlights (range + note), and cell pulses live here,
+  so grid overlays and the chat panel share one source of truth. Presence is our
+  own protocol, not engine state (`engine-constraints.md` explains why); it is
+  the client-side twin of the `sheets.channel.v1` frames, and gets fed from the
+  websocket channel when that lands.
 
-The grid (`Grid.tsx` + `renderer.ts`) is a custom canvas renderer — we chose
-it over `@ironcalc/workbook` because the published widget pins an old engine
-(0.5.x), drags in MUI/Emotion, and we need to own the overlay layer (agent
-presence) anyway. The model's own view state is authoritative: keyboard nav
-uses `onArrow*`/`onExpandSelectedRange`/`onNavigateToEdgeInDirection`, and the
+The grid (`src/components/workbook/Grid.tsx` + `renderer.ts`) is a custom canvas
+renderer. We chose it over `@ironcalc/workbook` because the published widget
+pins an older engine than we need, drags in MUI/Emotion, and we need to own the
+overlay layer (agent presence) anyway. The model's own view state is
+authoritative: keyboard nav uses
+`onArrow*`/`onExpandSelectedRange`/`onNavigateToEdgeInDirection`, and the
 renderer reads `getSelectedView()` each frame.
 
 ## The agent loop
 
 - `/api/chat` (`src/app/api/chat/route.ts`): AI SDK `streamText` against the
-  Anthropic API directly (`ANTHROPIC_API_KEY`; `SHEETS_CHAT_MODEL`, default
-  `claude-opus-4-8`). Tools are declared **without `execute`** — the SDK
-  forwards calls to the browser.
-- `ChatPanel.tsx` runs `onToolCall` → `AgentExecutor`
-  (`agent-executor.ts`), which executes against the controller and returns a
-  text result via `addToolOutput`;
+  Anthropic API directly (`ANTHROPIC_API_KEY`, `SHEETS_CHAT_MODEL`). Tools are
+  declared **without `execute`** — the SDK forwards calls to the browser.
+  `stopWhen: stepCountIs(24)` caps a single turn's tool loop.
+- `src/components/chat/ChatPanel.tsx` runs `onToolCall` → `AgentExecutor`
+  (`src/components/workbook/agent-executor.ts`), which executes against the
+  controller and returns a text result via `addToolOutput`;
   `sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls`
   continues the loop.
 - Tool surface (`src/lib/agent-tools.ts`, zod schemas shared by route and
-  executor): overview / read_range / set_cells / fill_range / clear_range /
-  format_range / modify_structure / add_sheet / rename_sheet / undo /
-  highlight_cells. Every mutation answers with the delta echo, so the agent
-  never re-reads ranges to learn state — this is the plan's core thesis in
-  miniature.
+  executor): get_workbook_overview / read_range / set_cells / fill_range /
+  clear_range / format_range / modify_structure / add_sheet / rename_sheet /
+  undo / highlight_cells. Every mutation answers with the delta echo, so the
+  agent never re-reads ranges to learn state.
+- **Workbook state is injected per request, never persisted into history.** Each
+  user turn gets a fresh `<current_workbook_state>` sketch appended to the last
+  user message. It rides the *last* message rather than the system prompt so the
+  cacheable prompt prefix stays byte-stable across turns; keeping it out of
+  stored history stops stale sketches from accumulating and contradicting each
+  other. The user can edit cells between turns, so the attached state outranks
+  anything older in the conversation.
 - Presence choreography lives in the executor: it focuses the target range
-  (dashed violet outline), switches the visible sheet to where it works,
-  pulses changed cells in the agent color, and `highlight_cells` is the
-  agent→user pointing finger.
+  (dashed violet outline), switches the visible sheet to where it works, pulses
+  changed cells in the agent color, and `highlight_cells` is the agent→user
+  pointing finger.
+- **Errors are deliberately unmasked.** `toUIMessageStreamResponse({ onError })`
+  surfaces the real gateway error instead of the SDK's generic default, because
+  there are no third-party users yet and a masked error costs more debugging time
+  than it buys safety. Revisit when the app has external users — provider errors
+  can carry internal detail.
 
-This chat is a stopgap for the eventual Ingram Cloud smith binding (plan
-§6.4); the tool surface deliberately mirrors the sheetkit MCP DSL verbs so the
-swap is a transport change, not a redesign.
+This chat is a stopgap. The eventual binding is an Ingram Cloud smith per
+workbook: an agent binding maps a smith's external id to a workbook, sheetd
+resolves `X-IC-Smith-External-Id → workbook`, and the chat panel renders IC run
+streams. The tool surface deliberately mirrors the sheetkit MCP DSL verbs so
+that swap is a transport change, not a redesign.
 
 ## Persistence & autosave
 
-`Workbook.tsx`: debounced (1.2 s) `PUT /api/workbooks/:id/bytes` after any
-dirty mutation, immediate flush on tab-hide, `beforeunload` warning while
-dirty. API routes are thin Drizzle queries (`src/lib/workbooks.ts`); the dev
-database is PGlite over a local socket (`bun run dev`), prod is the shared
-Ingram RDS instance (see the `sheets` stack in the infra repo).
+`src/components/workbook/Workbook.tsx`: debounced (1.2 s)
+`PUT /api/workbooks/:id/bytes` after any dirty mutation, immediate flush on
+tab-hide, `beforeunload` warning while dirty. API routes are thin Drizzle
+queries (`src/lib/workbooks.ts`); the dev database is PGlite over a local socket
+(`bun run dev`), prod is the shared `ingram-labs` RDS instance (the `sheets`
+stack in the infra repo owns the wiring).
+
+`workbook.id` is a DB-minted `uuidv7()`, exposed publicly only as `wb_<base58>`
+via `src/lib/ids.ts` — raw UUIDs never leave the server (a nextkit house rule;
+see the nk-dev guide).
+
+## Ownership
+
+Every workbook has exactly one owner: `workbook.user_id`, NOT NULL, FK to Better
+Auth's `user` table with `ON DELETE cascade` (so deleting an account takes its
+workbooks with it — which is also what erasure requests need). Better Auth's
+tables are raw SQL with deny-all RLS and are deliberately absent from the
+drizzle schema, so that FK is hand-written in `drizzle/0004_workbook_owner.sql`
+rather than emitted by drizzle-kit.
+
+The isolation model is a type-level one, not a convention:
+
+- Every function in `src/lib/workbooks.ts` takes the owning `userId` as a
+  required argument and folds it into the WHERE clause. There is no unscoped
+  read or write to forget to scope — a route that omits the owner fails to
+  compile.
+- Routes take the owner from `requireApiUser()` (`src/lib/session.ts`), which
+  returns either a 401 response or the user id. Never from the request body.
+- A workbook owned by someone else is reported **missing** (404), never
+  forbidden (403). A 403 would confirm that the id exists.
+
+This replaced a shared-workspace model in which the gate only asked "is anyone
+signed in", so every signed-in user could list, open, overwrite and delete every
+workbook in the database. Do not reintroduce an unscoped query helper.
 
 ## Google Sheets bridge
 
-A workbook links **1:1** to a Google spreadsheet (`workbook.
-google_spreadsheet_id`). "Save to Google Sheets" (File menu) creates the
-spreadsheet on first save and **full-replaces** the same one after — this app
-is the source of truth for linked workbooks. "Open from Google Sheets"
-(home page) searches spreadsheets reachable under the `drive.file` grant
-(created by this app or previously picked), accepts a pasted URL/id, and —
-when the Picker env vars are set — offers "Browse Google Drive" through the
-Google Picker (Google's own UI; picking a file grants this app access to
-just that file). Importing establishes the link, so saving writes back.
+A workbook links **1:1** to a Google spreadsheet
+(`workbook.google_spreadsheet_id`). "Save to Google Sheets" (File menu) creates
+the spreadsheet on first save and **full-replaces** the same one after — this app
+is the source of truth for linked workbooks. "Open from Google Sheets" (home
+page) searches spreadsheets reachable under the `drive.file` grant (created by
+this app or previously picked), accepts a pasted URL/id, and — when the Picker
+env vars are set — offers "Browse Google Drive" through the Google Picker
+(Google's own UI; picking a file grants this app access to just that file).
+Importing establishes the link, so saving writes back.
 
 The split follows the engine split: the browser builds/consumes a neutral
 snapshot — values, formulas, number formats (`src/lib/gsheets-transfer.ts`
-schema, `google-snapshot.ts` builder) — and the server
-(`src/lib/gsheets.ts`) exchanges it with the Sheets v4 API using the OAuth
-token from Better Auth's `account` table (`auth.api.getAccessToken`
-refreshes it). If the user declined the optional spreadsheets scope at
-sign-in, routes answer `google_scope_missing` and the client offers
-incremental consent via `linkSocial`. Full-Drive *listing* scopes are
-restricted (heavy verification for the shared OAuth client), which is why
-browse goes through the Picker + non-sensitive `drive.file` instead. Richer
-style transfer is a follow-up.
+schema, `src/components/workbook/google-snapshot.ts` builder) — and the server
+(`src/lib/gsheets.ts`) exchanges it with the Sheets v4 API using the OAuth token
+from Better Auth's `account` table (`auth.api.getAccessToken` refreshes it). If
+the user declined the optional spreadsheets scope at sign-in, routes answer
+`google_scope_missing` and the client offers incremental consent via
+`linkSocial`. Full-Drive *listing* scopes are restricted (heavy verification for
+the shared OAuth client), which is why browse goes through the Picker +
+non-sensitive `drive.file` instead. Richer style transfer is a follow-up.
 
 ## What is deliberately NOT here yet
 
-- **Membership / per-user workspaces** — sign-in exists (Better Auth via
-  `@ingram-tech/nk-auth`, Google-only, mounted at `/auth`; see `src/lib/auth.ts`)
-  but every signed-in user still shares ONE workspace — no ownership columns,
-  no sharing model. Sign-in also (optionally, via Google's granular consent)
-  requests the `spreadsheets` scope and stores a refresh token in the
-  `account` table — the Google Sheets bridge above runs on it.
+- **Sharing / membership** — workbooks now have exactly one owner (see
+  "Ownership" below), so there is no *sharing*: no membership table, no roles,
+  no per-range ACL. A workbook is reachable by its owner or by nobody.
+  Sign-in also (optionally, via Google's granular consent) requests the
+  `spreadsheets` scope and stores a refresh token in the `account` table — the
+  Google Sheets bridge runs on it.
 - **sheetd + realtime channel** — single-client editing only; the engine diff
-  queue (`flushSendQueue`/`applyExternalDiffs`) is unused until then.
+  queue (`flushSendQueue`/`applyExternalDiffs`) is carried unused until then.
+
+  The end state it slots into: one authoritative `UserModel` per workbook in
+  sheetd. Every principal (human or agent) submits *commands*; the server
+  serializes them, applies, and broadcasts engine diff blobs + presence with a
+  monotonic per-workbook sequence number. Clients are replicas. No CRDT or OT —
+  the ordered log is the truth, which is exactly the shape IronCalc's own diff
+  queue anticipates. Whether human typing needs an optimistic local echo or can
+  just round-trip is unmeasured; measure before building the optimism.
+- **Highlights as data** — `controller.highlights` is in-memory only, with a
+  local `hl-N` sequence. The intended end state is first-class rows (range,
+  author, color, note, resolved) so highlights thread into per-range discussions
+  and the agent reads user highlights as input. The schema has exactly one table
+  (`workbook`) today.
 - **csv + xlsx import** — xlsx *export* and the Google Sheets bridge exist
   client-side; file imports arrive with sheetd (server-side import keeps the
   client thin).
-- **Frozen panes, merged cells, borders UI, wrap text** — engine supports
-  them; renderer/toolbar don't yet.
+- **Frozen panes, merged cells, borders UI, wrap text** — engine supports them;
+  renderer/toolbar don't yet.

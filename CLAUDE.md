@@ -2,34 +2,38 @@
 
 @./node_modules/@ingram-tech/nk-dev/guide.md
 
-AI-native collaborative spreadsheet UI (deliverable 3 of the Sheets plan; the
-OSS engine side lives in the public `sheetkit` repo). **Read
-[`docs/architecture.md`](./docs/architecture.md) before structural changes** —
-it explains the in-browser engine model and where sheetd will slot in later.
+AI-native collaborative spreadsheet UI; the OSS engine side lives in the public
+`sheetkit` repo. **Read [`docs/architecture.md`](./docs/architecture.md) before
+structural changes** — it explains the in-browser engine model and where sheetd
+will slot in later. [`docs/engine-constraints.md`](./docs/engine-constraints.md)
+covers the IronCalc limits that force those choices; read it before "optimizing"
+the delta echo, the engine pin, or presence.
 
 ## The short version
 
-- The spreadsheet engine is **IronCalc wasm running in the browser**
-  (`@ironcalc/wasm`, pinned). The server never parses spreadsheet content — it
-  stores opaque engine bytes in Postgres (`workbook.bytes`).
+- The spreadsheet engine is **IronCalc wasm running in the browser**. The server
+  never parses spreadsheet content — it stores opaque engine bytes in Postgres
+  (`workbook.bytes`).
 - `WorkbookController` (`src/components/workbook/controller.ts`) is the single
   owner of the model: every read/write from React, keyboard, and agent tools
-  goes through it (change notification, autosave dirty-tracking, geometry
-  cache, delta echo).
+  goes through it.
 - The agent chats via `/api/chat` (AI SDK + direct Anthropic API) but its
   tools execute **client-side** against the same controller — that's what
   makes its activity visible live in the grid (presence overlays, pulses,
   highlights).
 - Google sign-in via Better Auth / `@ingram-tech/nk-auth` (`src/lib/auth.ts`,
-  mounted at `/auth`), but still ONE shared workspace — every signed-in user
-  sees every workbook. Don't build per-user assumptions into the storage
-  layer until membership lands.
+  mounted at `/auth`). **Workbooks are per-owner**: `workbook.user_id` is NOT
+  NULL and every function in `src/lib/workbooks.ts` takes the owner and folds
+  it into the WHERE clause, so an unscoped query doesn't type-check. Routes get
+  the owner from `requireApiUser()` (`src/lib/session.ts`), never from the
+  request body. Someone else's workbook answers 404, not 403. There is still no
+  *sharing* model — one owner per workbook, no membership table.
 
 ## Commands
 
 ```bash
 bun run dev        # PGlite (no Docker) + migrations + next dev
-bun run check      # oxlint + oxfmt — run before pushing
+bun run check      # oxlint + oxfmt + knip — run before pushing
 bun run typecheck
 bun run test
 bun run db:generate && bun run db:migrate   # after schema changes
