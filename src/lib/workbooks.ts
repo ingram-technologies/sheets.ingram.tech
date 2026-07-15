@@ -25,8 +25,11 @@ const metaColumns = {
 };
 
 // The id codec lives at this boundary: rows carry UUIDv7, everything returned
-// or accepted here uses the public `wb_…` skin. A malformed/mismatched public
-// id decodes to null and behaves exactly like a missing row.
+// or accepted here uses the public `wb_…` skin. The explicit decodeOrNull
+// gates are validation, not translation — a malformed/mismatched public id
+// behaves exactly like a missing row (404, not a Postgres type error). The
+// schema's idColumn additionally decodes any skinned id that reaches a typed
+// query, so a missed decode elsewhere can no longer 500.
 function toMeta(row: {
 	id: string;
 	name: string;

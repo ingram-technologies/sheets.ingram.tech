@@ -1,5 +1,7 @@
 import { sql } from "drizzle-orm";
-import { customType, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { customType, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+
+import { idColumn } from "./ids";
 
 /**
  * Workbook bytes are the IronCalc native serialization (`Model.toBytes()`),
@@ -15,7 +17,8 @@ const bytea = customType<{ data: Uint8Array; driverData: Buffer }>({
 export const workbooks = pgTable("workbook", {
 	// UUIDv7 at rest (DB-minted — Postgres ≥18 everywhere: prod RDS 18.4,
 	// PGlite 18 in dev); exposed publicly only as `wb_<base58>` via lib/ids.
-	id: uuid("id")
+	// idColumn decodes a skinned `wb_…` id in queries before it hits Postgres.
+	id: idColumn("workbook")("id")
 		.primaryKey()
 		.default(sql`uuidv7()`),
 	name: text("name").notNull(),
