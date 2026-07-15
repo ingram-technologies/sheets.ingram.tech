@@ -12,6 +12,7 @@ import {
 import type { CellRange } from "@/lib/a1";
 import { MAX_COLUMN, MAX_ROW } from "@/lib/a1";
 
+import type { CommitMove } from "./CellEditor";
 import { CellEditor } from "./CellEditor";
 import type { WorkbookController } from "./controller";
 import {
@@ -312,7 +313,7 @@ export function Grid({
 	);
 
 	const commitEdit = useCallback(
-		(value: string, move: "down" | "right" | "none") => {
+		(value: string, move: CommitMove) => {
 			if (!editing) return;
 			const { row, col } = editing;
 			setEditing(null);
@@ -320,11 +321,18 @@ export function Grid({
 				model.setUserInput(model.getSelectedSheet(), row, col, value);
 			});
 			controller.view((model) => {
+				// Shift+Enter and Shift+Tab move back the way they came, as they
+				// do in every spreadsheet. Rows/cols are 1-based, hence the
+				// clamp at 1 rather than 0.
 				if (move === "down")
 					model.setSelectedCell(Math.min(row + 1, MAX_ROW), col);
-				else if (move === "right") {
+				else if (move === "up")
+					model.setSelectedCell(Math.max(row - 1, 1), col);
+				else if (move === "right")
 					model.setSelectedCell(row, Math.min(col + 1, MAX_COLUMN));
-				} else model.setSelectedCell(row, col);
+				else if (move === "left")
+					model.setSelectedCell(row, Math.max(col - 1, 1));
+				else model.setSelectedCell(row, col);
 			});
 			ensureVisible();
 			containerRef.current?.focus();
@@ -865,7 +873,7 @@ export function Grid({
 			) : null}
 			{resizeGuide ? (
 				<div
-					className="pointer-events-none absolute z-10 bg-[var(--sheet-selection)]"
+					className="pointer-events-none absolute z-[var(--z-grid-overlay)] bg-[var(--sheet-selection)]"
 					style={
 						resizeGuide.axis === "col"
 							? { left: resizeGuide.pos, top: 0, bottom: 0, width: 1 }
@@ -875,7 +883,7 @@ export function Grid({
 			) : null}
 			{menu ? (
 				<div
-					className="absolute z-20 min-w-44 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
+					className="absolute z-[var(--z-dropdown)] min-w-44 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
 					style={{ left: menu.x, top: menu.y }}
 				>
 					{menuActions.map((action) => (
