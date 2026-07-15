@@ -1104,7 +1104,6 @@
 
     "@fast-csv/parse/@types/node": ["@types/node@14.18.63", "", {}, "sha512-fAtCfv4jJg+ExtXhvCkCqUKZ+4ok/JQk01qDKhL5BDDoS3AxKXhV5/MAVUZyQnSEd2GT92fkgZl0pz0Q0AzcIQ=="],
 
-    "@ingram-tech/nk-auth/@ingram-tech/nk-db": ["@ingram-tech/nk-db@1.3.1", "", { "dependencies": { "zod": "^4.4.3" }, "peerDependencies": { "@electric-sql/pglite": ">=0.5.0", "@electric-sql/pglite-socket": ">=0.2.4", "drizzle-orm": ">=0.44.0", "pg": "^8.13.0" }, "optionalPeers": ["@electric-sql/pglite", "@electric-sql/pglite-socket"], "bin": { "nk-pglite-dev": "dist/pglite/dev.js", "nk-pg-migrate": "dist/migrate-bin.js" } }, "sha512-uqi2u9+E9aqxpUoIEASHfIk0n1Lqaavy6IOslwdvjk4JHjMbG+NuxCzAKJHyjuQt27zXtHMCnputiEJHY98teQ=="],
 
     "@oxc-parser/binding-wasm32-wasi/@emnapi/runtime": ["@emnapi/runtime@1.11.1", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-vgj7R3y3Wgx24IQaGPA/R6YFXLHVMOZ0uVEyIQPaWs+rd1AzfEMXlAC22FYwO1XkKR6NPsq7mUandH8oIRdZFw=="],
 
