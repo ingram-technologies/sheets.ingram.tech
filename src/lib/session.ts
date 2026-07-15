@@ -6,12 +6,26 @@ export const { getSession, getUser, requireUser, redirectIfAuthenticated } =
 	createAuthHelpers(auth);
 
 /**
- * Validated session gate for API routes: returns a 401 Response when there is
- * no session, null when the request may proceed. The workspace is still
- * shared (no per-user ownership), so routes only need "is signed in".
+ * Session gate for API routes. Returns either a 401 Response to hand straight
+ * back, or the owning user id every workbook query needs.
+ *
+ * This deliberately yields the *user* rather than a boolean: workbooks are
+ * per-owner, and a gate that only answers "is someone signed in" is what let
+ * every signed-in user read and delete every workbook. Callers must pass the
+ * returned `userId` into lib/workbooks — those functions take it as a required
+ * argument, so an unscoped query won't type-check.
+ *
+ * Usage:
+ *   const gate = await requireApiUser();
+ *   if ("response" in gate) return gate.response;
+ *   … gate.userId …
  */
-export async function requireApiSession(): Promise<Response | null> {
+export async function requireApiUser(): Promise<
+	{ response: Response } | { userId: string }
+> {
 	const session = await getSession();
-	if (!session) return Response.json({ error: "unauthorized" }, { status: 401 });
-	return null;
+	if (!session?.user?.id) {
+		return { response: Response.json({ error: "unauthorized" }, { status: 401 }) };
+	}
+	return { userId: session.user.id };
 }

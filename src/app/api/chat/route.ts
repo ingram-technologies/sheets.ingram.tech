@@ -4,7 +4,7 @@ import { convertToModelMessages, stepCountIs, streamText } from "ai";
 import { z } from "zod";
 
 import { AGENT_TOOL_DESCRIPTIONS, agentToolSchemas } from "@/lib/agent-tools";
-import { requireApiSession } from "@/lib/session";
+import { requireApiUser } from "@/lib/session";
 
 export const maxDuration = 120;
 
@@ -30,8 +30,11 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
-	const denied = await requireApiSession();
-	if (denied) return denied;
+	// Sign-in gate only: this route touches no workbook rows. The tools run in
+	// the caller's own browser against their own loaded model, and the sketch
+	// arrives in the body — so there is nothing here to scope by owner.
+	const gate = await requireApiUser();
+	if ("response" in gate) return gate.response;
 	const parsed = bodySchema.safeParse(await request.json());
 	if (!parsed.success) {
 		return Response.json({ error: "invalid body" }, { status: 400 });

@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db, schema } from "./db";
@@ -48,36 +48,58 @@ function toMeta(row: {
 	};
 }
 
-export async function listWorkbooks(): Promise<WorkbookMeta[]> {
+/**
+ * Every function here takes the owning `userId` and folds it into the WHERE
+ * clause. This is the whole isolation model: there is no unscoped read or
+ * write, so a route that forgets to scope cannot compile rather than quietly
+ * serving someone else's workbook.
+ *
+ * A workbook owned by another user is reported as *missing*, never as
+ * forbidden — a 403 would confirm the id exists, which is itself a leak given
+ * ids are enumerable-ish. Callers turn null into a 404.
+ */
+function owned(uuid: string, userId: string) {
+	return and(eq(schema.workbooks.id, uuid), eq(schema.workbooks.userId, userId));
+}
+
+export async function listWorkbooks(userId: string): Promise<WorkbookMeta[]> {
 	const rows = await db
 		.select(metaColumns)
 		.from(schema.workbooks)
+		.where(eq(schema.workbooks.userId, userId))
 		.orderBy(desc(schema.workbooks.updatedAt));
 	return rows.map(toMeta);
 }
 
-export async function getWorkbookMeta(id: string): Promise<WorkbookMeta | null> {
+export async function getWorkbookMeta(
+	id: string,
+	userId: string,
+): Promise<WorkbookMeta | null> {
 	const uuid = ids.workbook.decodeOrNull(id);
 	if (!uuid) return null;
 	const rows = await db
 		.select(metaColumns)
 		.from(schema.workbooks)
-		.where(eq(schema.workbooks.id, uuid));
+		.where(owned(uuid, userId));
 	const row = rows[0];
 	return row ? toMeta(row) : null;
 }
 
-export async function getWorkbookBytes(id: string): Promise<Uint8Array | null> {
+export async function getWorkbookBytes(
+	id: string,
+	userId: string,
+): Promise<Uint8Array | null> {
 	const uuid = ids.workbook.decodeOrNull(id);
 	if (!uuid) return null;
 	const rows = await db
 		.select({ bytes: schema.workbooks.bytes })
 		.from(schema.workbooks)
-		.where(eq(schema.workbooks.id, uuid));
+		.where(owned(uuid, userId));
 	return rows[0]?.bytes ?? null;
 }
 
 export async function createWorkbook(input: {
+	userId: string;
 	name: string;
 	bytes: Uint8Array;
 	googleSpreadsheetId?: string;
@@ -91,6 +113,7 @@ export async function createWorkbook(input: {
 /** Record (or refresh) the 1:1 link after a "Save to Google Sheets". */
 export async function linkGoogleSpreadsheet(
 	id: string,
+	userId: string,
 	googleSpreadsheetId: string,
 ): Promise<boolean> {
 	const uuid = ids.workbook.decodeOrNull(id);
@@ -98,13 +121,14 @@ export async function linkGoogleSpreadsheet(
 	const rows = await db
 		.update(schema.workbooks)
 		.set({ googleSpreadsheetId })
-		.where(eq(schema.workbooks.id, uuid))
+		.where(owned(uuid, userId))
 		.returning({ id: schema.workbooks.id });
 	return rows.length > 0;
 }
 
 export async function saveWorkbookBytes(
 	id: string,
+	userId: string,
 	bytes: Uint8Array,
 ): Promise<WorkbookMeta | null> {
 	const uuid = ids.workbook.decodeOrNull(id);
@@ -112,7 +136,7 @@ export async function saveWorkbookBytes(
 	const rows = await db
 		.update(schema.workbooks)
 		.set({ bytes, updatedAt: new Date() })
-		.where(eq(schema.workbooks.id, uuid))
+		.where(owned(uuid, userId))
 		.returning(metaColumns);
 	const row = rows[0];
 	return row ? toMeta(row) : null;
@@ -120,6 +144,7 @@ export async function saveWorkbookBytes(
 
 export async function renameWorkbook(
 	id: string,
+	userId: string,
 	name: string,
 ): Promise<WorkbookMeta | null> {
 	const uuid = ids.workbook.decodeOrNull(id);
@@ -127,18 +152,18 @@ export async function renameWorkbook(
 	const rows = await db
 		.update(schema.workbooks)
 		.set({ name, updatedAt: new Date() })
-		.where(eq(schema.workbooks.id, uuid))
+		.where(owned(uuid, userId))
 		.returning(metaColumns);
 	const row = rows[0];
 	return row ? toMeta(row) : null;
 }
 
-export async function deleteWorkbook(id: string): Promise<boolean> {
+export async function deleteWorkbook(id: string, userId: string): Promise<boolean> {
 	const uuid = ids.workbook.decodeOrNull(id);
 	if (!uuid) return false;
 	const rows = await db
 		.delete(schema.workbooks)
-		.where(eq(schema.workbooks.id, uuid))
+		.where(owned(uuid, userId))
 		.returning({ id: schema.workbooks.id });
 	return rows.length > 0;
 }

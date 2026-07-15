@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-import { requireApiSession } from "@/lib/session";
+import { requireApiUser } from "@/lib/session";
 import { createWorkbook, listWorkbooks } from "@/lib/workbooks";
 
 export async function GET() {
-	const denied = await requireApiSession();
-	if (denied) return denied;
-	return Response.json(await listWorkbooks());
+	const gate = await requireApiUser();
+	if ("response" in gate) return gate.response;
+	return Response.json(await listWorkbooks(gate.userId));
 }
 
 const createSchema = z.object({
@@ -22,13 +22,15 @@ const createSchema = z.object({
 });
 
 export async function POST(request: Request) {
-	const denied = await requireApiSession();
-	if (denied) return denied;
+	const gate = await requireApiUser();
+	if ("response" in gate) return gate.response;
 	const parsed = createSchema.safeParse(await request.json());
 	if (!parsed.success) {
 		return Response.json({ error: z.treeifyError(parsed.error) }, { status: 400 });
 	}
 	const meta = await createWorkbook({
+		// Owner always comes from the session, never the request body.
+		userId: gate.userId,
 		name: parsed.data.name,
 		bytes: Uint8Array.from(Buffer.from(parsed.data.bytes, "base64")),
 		googleSpreadsheetId: parsed.data.googleSpreadsheetId,

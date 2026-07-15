@@ -19,9 +19,13 @@ const bodySchema = z.object({ snapshot: snapshotSchema });
  */
 export async function POST(request: Request, { params }: Params) {
 	const session = await getSession();
-	if (!session) return Response.json({ error: "unauthorized" }, { status: 401 });
+	if (!session?.user?.id) {
+		return Response.json({ error: "unauthorized" }, { status: 401 });
+	}
 	const { id } = await params;
-	const meta = await getWorkbookMeta(id);
+	// Scoped: without this, any signed-in user could push their own snapshot
+	// into another user's linked Google spreadsheet, which full-replaces it.
+	const meta = await getWorkbookMeta(id, session.user.id);
 	if (!meta) return Response.json({ error: "not found" }, { status: 404 });
 
 	const parsed = bodySchema.safeParse(await request.json());
@@ -40,7 +44,7 @@ export async function POST(request: Request, { params }: Params) {
 			},
 		);
 		if (spreadsheetId !== meta.googleSpreadsheetId) {
-			await linkGoogleSpreadsheet(id, spreadsheetId);
+			await linkGoogleSpreadsheet(id, session.user.id, spreadsheetId);
 		}
 		return Response.json({ spreadsheetId, url: spreadsheetUrl(spreadsheetId) });
 	} catch (error) {
