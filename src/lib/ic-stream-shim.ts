@@ -1,7 +1,7 @@
 /**
  * TEMPORARY — Ingram Cloud `/v1/responses` SSE normalizer. Delete when
- * cloud.ingram.tech ships granular Responses stream events (tracked in the
- * follow-up to cloud.ingram.tech#163).
+ * cloud.ingram.tech ships granular Responses stream events (tracked in
+ * cloud.ingram.tech#165).
  *
  * IC currently streams only item-level events: `response.output_item.added/
  * .done` carry complete items, with no granular delta events at all. The AI
