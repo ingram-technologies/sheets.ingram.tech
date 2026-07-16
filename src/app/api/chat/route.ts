@@ -1,15 +1,18 @@
-import { anthropic } from "@ai-sdk/anthropic";
+import { createIngramCloud } from "@ingram-cloud/ai-sdk";
 import type { UIMessage } from "ai";
 import { convertToModelMessages, stepCountIs, streamText } from "ai";
 import { z } from "zod";
 
 import { AGENT_TOOL_DESCRIPTIONS, agentToolSchemas } from "@/lib/agent-tools";
+import { icShimFetch } from "@/lib/ic-stream-shim";
 import { requireApiUser } from "@/lib/session";
 
 export const maxDuration = 120;
 
-// Direct Anthropic API (ANTHROPIC_API_KEY); model overridable via env.
-const MODEL = process.env.SHEETS_CHAT_MODEL ?? "claude-opus-4-8";
+// Ingram Cloud runs inference (BYOK: our Anthropic key, wired in infra). ""
+// means the IC agent's configured model (claude-opus-4-8, owned by the sheets
+// Pulumi stack); set SHEETS_CHAT_MODEL to override per-deployment.
+const MODEL = process.env.SHEETS_CHAT_MODEL ?? "";
 
 const SYSTEM_PROMPT = `You are the spreadsheet agent of sheets.ingram.tech, working live inside the user's workbook. The user sees your cursor, highlights, and every cell you touch in real time.
 
@@ -42,12 +45,26 @@ export async function POST(request: Request) {
 	// UIMessage[] is structurally validated by convertToModelMessages below.
 	const messages = messagesAsUi(parsed.data.messages);
 
+	// Tenant token + IC-Agent-Id + the `user` field below: Ingram Cloud lazily
+	// provisions one smith per (user, agent) — no provisioning code here. Turns
+	// stay stateless (no threadId): the messages we send are the whole context,
+	// and the browser owns the history exactly as before the port.
+	const ingram = createIngramCloud({
+		apiKey: process.env.INGRAM_CLOUD_TOKEN ?? "",
+		headers: { "IC-Agent-Id": process.env.IC_AGENT_ID ?? "" },
+		// Temporary SSE normalizer — see src/lib/ic-stream-shim.ts.
+		fetch: icShimFetch,
+	});
+
 	const result = streamText({
-		model: anthropic(MODEL),
+		model: ingram(MODEL),
+		// Appended to the IC agent's instructions — which are empty on purpose,
+		// so this stays the entire prompt (cloud.ingram.tech#163).
 		system: SYSTEM_PROMPT,
 		messages: await convertToModelMessages(
 			withWorkbookState(messages, parsed.data.overview),
 		),
+		providerOptions: { openai: { user: `user:${gate.userId}` } },
 		stopWhen: stepCountIs(24),
 		// All tools execute client-side against the in-browser engine — no
 		// execute functions here; calls are forwarded to the browser.
