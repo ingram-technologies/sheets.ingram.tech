@@ -31,9 +31,18 @@ function asObject(value: unknown): SseJson | undefined {
 }
 
 /** Rewrite one parsed SSE `data:` payload; returns extra blocks to emit first. */
-function normalizeEvent(event: SseJson): { prepend: string[] } {
+function normalizeEvent(
+	event: SseJson,
+	itemsWithRealDeltas: Set<string>,
+): { prepend: string[] } {
 	const prepend: string[] = [];
 	const type = event.type;
+	// IC emits real text deltas on tool-less turns (but none when the request
+	// carries tools, as every chat turn here does). Track which items already
+	// streamed for real, so we never synthesize a duplicate for them.
+	if (type === "response.output_text.delta" && typeof event.item_id === "string") {
+		itemsWithRealDeltas.add(event.item_id);
+	}
 	const item = asObject(event.item);
 	if (!item) return { prepend };
 
@@ -46,7 +55,11 @@ function normalizeEvent(event: SseJson): { prepend: string[] } {
 		item.status = "completed";
 	}
 
-	if (type === "response.output_item.done" && item.type === "message") {
+	if (
+		type === "response.output_item.done" &&
+		item.type === "message" &&
+		!(typeof item.id === "string" && itemsWithRealDeltas.has(item.id))
+	) {
 		const content = Array.isArray(item.content) ? item.content : [];
 		for (const part of content) {
 			const block = asObject(part);
@@ -68,7 +81,7 @@ function normalizeEvent(event: SseJson): { prepend: string[] } {
 }
 
 /** Rewrite one full SSE block (`event:`/`data:` lines, no trailing \n\n). */
-function normalizeBlock(block: string): string {
+function normalizeBlock(block: string, itemsWithRealDeltas: Set<string>): string {
 	const lines = block.split("\n");
 	const dataLine = lines.find((line) => line.startsWith("data: "));
 	if (dataLine === undefined) return `${block}\n\n`;
@@ -81,7 +94,7 @@ function normalizeBlock(block: string): string {
 	}
 	const event = asObject(parsed);
 	if (!event) return `${block}\n\n`;
-	const { prepend } = normalizeEvent(event);
+	const { prepend } = normalizeEvent(event, itemsWithRealDeltas);
 	lines[dataIndex] = `data: ${JSON.stringify(event)}`;
 	return `${prepend.join("")}${lines.join("\n")}\n\n`;
 }
@@ -91,6 +104,7 @@ function normalizeSseStream(
 ): ReadableStream<Uint8Array> {
 	const decoder = new TextDecoder();
 	const encoder = new TextEncoder();
+	const itemsWithRealDeltas = new Set<string>();
 	let buffer = "";
 	return body.pipeThrough(
 		new TransformStream<Uint8Array, Uint8Array>({
@@ -99,13 +113,17 @@ function normalizeSseStream(
 				const blocks = buffer.split("\n\n");
 				buffer = blocks.pop() ?? "";
 				for (const block of blocks) {
-					controller.enqueue(encoder.encode(normalizeBlock(block)));
+					controller.enqueue(
+						encoder.encode(normalizeBlock(block, itemsWithRealDeltas)),
+					);
 				}
 			},
 			flush(controller) {
 				buffer += decoder.decode();
 				if (buffer !== "")
-					controller.enqueue(encoder.encode(normalizeBlock(buffer)));
+					controller.enqueue(
+						encoder.encode(normalizeBlock(buffer, itemsWithRealDeltas)),
+					);
 			},
 		}),
 	);
