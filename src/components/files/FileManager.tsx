@@ -159,41 +159,6 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 				}
 			/>
 
-			{/*
-			 * What this is. The product's whole argument is the inversion —
-			 * the spreadsheet is a tool the agent uses, not a chat bolted onto
-			 * a grid — so the home surface states it plainly rather than
-			 * selling it.
-			 */}
-			<section className="mb-8 max-w-xl space-y-3">
-				<h2 className="text-lg font-semibold tracking-tight text-balance">
-					A spreadsheet for agents to use — not one with AI bolted on.
-				</h2>
-				<p className="text-sm leading-relaxed text-muted-foreground text-pretty">
-					Claude in Excel and Gemini in Google Sheets put the model{" "}
-					<span className="font-medium text-foreground">inside</span> the
-					sheet, reaching in through an MCP. We turn that around: the
-					spreadsheet is a primitive the agent operates{" "}
-					<span className="font-medium text-foreground">directly</span>, and
-					this page is just a live window onto what it does. The engine runs
-					in your browser and the agent&apos;s edits land in the cells
-					you&apos;re editing — so you watch it work instead of reading a
-					transcript.
-				</p>
-				<p className="text-xs text-muted-foreground">
-					An experiment from{" "}
-					<a
-						href="https://ingram.tech"
-						target="_blank"
-						rel="noreferrer"
-						className="text-foreground underline-offset-4 hover:underline"
-					>
-						Ingram
-					</a>
-					.
-				</p>
-			</section>
-
 			{workbooks.length === 0 ? (
 				<EmptyState
 					icon={FileSpreadsheetIcon}
@@ -333,6 +298,28 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 				onOpenChange={setTrashOpen}
 				onChange={() => router.refresh()}
 			/>
+
+			<footer className="mt-16 flex flex-col items-center gap-2 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:justify-between">
+				<p>
+					© {new Date().getFullYear()}{" "}
+					<a
+						href="https://ingram.tech"
+						target="_blank"
+						rel="noreferrer"
+						className="underline-offset-4 transition-colors hover:text-foreground hover:underline"
+					>
+						Ingram Technologies
+					</a>
+				</p>
+				<a
+					href="https://ingram.tech/privacy"
+					target="_blank"
+					rel="noreferrer"
+					className="underline-offset-4 transition-colors hover:text-foreground hover:underline"
+				>
+					Privacy
+				</a>
+			</footer>
 		</main>
 	);
 }

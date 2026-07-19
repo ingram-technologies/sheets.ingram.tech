@@ -6,7 +6,7 @@ import { createAuthMiddleware } from "@ingram-tech/nk-auth/middleware";
 // with, so the homepage relies on its validated requireUser() gate instead.
 // `proxy` is Next 16's name for middleware.
 export const proxy = createAuthMiddleware({
-	protectedPaths: ["/w"],
+	protectedPaths: ["/w", "/spreadsheets"],
 	signInPath: "/login",
 });
 

@@ -11,7 +11,7 @@ export default async function LoginPage({
 }: {
 	searchParams: Promise<{ next?: string }>;
 }) {
-	const next = safeNext((await searchParams).next) ?? "/";
+	const next = safeNext((await searchParams).next) ?? "/spreadsheets";
 	await redirectIfAuthenticated(next);
 	return <LoginForm next={next} />;
 }
