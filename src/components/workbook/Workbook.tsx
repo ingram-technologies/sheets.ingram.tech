@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { ArrowLeftIcon, PanelRightCloseIcon, PanelRightOpenIcon } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -184,7 +184,7 @@ export function Workbook({
 					aria-label="All workbooks"
 					className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
 				>
-					<ArrowLeft className="size-4" />
+					<ArrowLeftIcon className="size-4" />
 				</Link>
 				{/* The brand mark, not a generic grid glyph — login already uses it. */}
 				<SheetsMark className="size-4 shrink-0 text-primary" />
@@ -208,9 +208,9 @@ export function Workbook({
 					onClick={() => setChatOpen((open) => !open)}
 				>
 					{chatOpen ? (
-						<PanelRightClose className="size-4" />
+						<PanelRightCloseIcon className="size-4" />
 					) : (
-						<PanelRightOpen className="size-4" />
+						<PanelRightOpenIcon className="size-4" />
 					)}
 				</Button>
 				<UserMenu />

@@ -1,7 +1,7 @@
 "use client";
 
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
-import { Check, ChevronRight, Circle } from "lucide-react";
+import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react";
 import type * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -96,7 +96,7 @@ function DropdownMenuCheckboxItem({
 		>
 			<span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
 				<MenuPrimitive.CheckboxItemIndicator>
-					<Check className="h-4 w-4" />
+					<CheckIcon className="h-4 w-4" />
 				</MenuPrimitive.CheckboxItemIndicator>
 			</span>
 			{children}
@@ -120,7 +120,7 @@ function DropdownMenuRadioItem({
 		>
 			<span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
 				<MenuPrimitive.RadioItemIndicator>
-					<Circle className="h-2 w-2 fill-current" />
+					<CircleIcon className="h-2 w-2 fill-current" />
 				</MenuPrimitive.RadioItemIndicator>
 			</span>
 			{children}
@@ -191,7 +191,7 @@ function DropdownMenuSubTrigger({
 			{...props}
 		>
 			{children}
-			<ChevronRight className="ml-auto h-4 w-4" />
+			<ChevronRightIcon className="ml-auto h-4 w-4" />
 		</MenuPrimitive.SubmenuTrigger>
 	);
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { FileSpreadsheet, MoreHorizontal, Plus } from "lucide-react";
+import { FileSpreadsheetIcon, MoreHorizontalIcon, PlusIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState } from "react";
@@ -122,7 +122,7 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 							onClick={() => void createWorkbook()}
 							disabled={creating}
 						>
-							<Plus className="size-4" />
+							<PlusIcon className="size-4" />
 							{creating ? "Creating…" : "New workbook"}
 						</Button>
 						<UserMenu />
@@ -132,7 +132,7 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 
 			{workbooks.length === 0 ? (
 				<EmptyState
-					icon={FileSpreadsheet}
+					icon={FileSpreadsheetIcon}
 					title="No workbooks yet"
 					description="Create your first workbook and ask the agent to build something in it."
 					action={
@@ -140,7 +140,7 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 							onClick={() => void createWorkbook()}
 							disabled={creating}
 						>
-							<Plus className="size-4" />
+							<PlusIcon className="size-4" />
 							New workbook
 						</Button>
 					}
@@ -164,7 +164,7 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 										title={workbook.name}
 										className="flex items-center gap-2.5 rounded-sm px-2 py-3 font-medium"
 									>
-										<FileSpreadsheet className="size-4 shrink-0 text-muted-foreground" />
+										<FileSpreadsheetIcon className="size-4 shrink-0 text-muted-foreground" />
 										<span className="truncate">
 											{workbook.name}
 										</span>
@@ -195,7 +195,7 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 													aria-label={`Actions for ${workbook.name}`}
 													className="size-7 text-muted-foreground opacity-0 group-hover:opacity-100 data-popup-open:opacity-100"
 												>
-													<MoreHorizontal className="size-4" />
+													<MoreHorizontalIcon className="size-4" />
 												</Button>
 											}
 										/>

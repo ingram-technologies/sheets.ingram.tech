@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { LogOutIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -75,7 +75,7 @@ export function UserMenu() {
 						})
 					}
 				>
-					<LogOut className="size-4" />
+					<LogOutIcon className="size-4" />
 					Sign out
 				</DropdownMenuItem>
 			</DropdownMenuContent>

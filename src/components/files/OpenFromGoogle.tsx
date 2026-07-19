@@ -1,12 +1,12 @@
 "use client";
 
 import {
-	Download,
-	FileSpreadsheet,
-	FolderSearch,
-	Link2,
-	Loader2,
-	Search,
+	DownloadIcon,
+	FileSpreadsheetIcon,
+	FolderSearchIcon,
+	Link2Icon,
+	Loader2Icon,
+	SearchIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -186,7 +186,7 @@ export function OpenFromGoogle() {
 	return (
 		<>
 			<Button variant="outline" onClick={() => setOpen(true)}>
-				<FileSpreadsheet className="size-4" />
+				<FileSpreadsheetIcon className="size-4" />
 				Open from Google Sheets
 			</Button>
 			<Dialog
@@ -207,7 +207,7 @@ export function OpenFromGoogle() {
 					</DialogHeader>
 
 					<div className="relative">
-						<Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+						<SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
 						<Input
 							autoFocus
 							className="pl-8"
@@ -237,7 +237,7 @@ export function OpenFromGoogle() {
 							<ScopePrompt />
 						) : linkedId ? (
 							<ResultRow
-								icon={Link2}
+								icon={Link2Icon}
 								title="Import from this link"
 								subtitle={linkedId}
 								disabled={importing}
@@ -250,7 +250,7 @@ export function OpenFromGoogle() {
 								{results.map((file) => (
 									<ResultRow
 										key={file.id}
-										icon={FileSpreadsheet}
+										icon={FileSpreadsheetIcon}
 										title={file.name}
 										subtitle={formatModified(file.modifiedTime)}
 										disabled={importing}
@@ -276,7 +276,7 @@ export function OpenFromGoogle() {
 								disabled={browsing || importing}
 								onClick={() => void browseDrive()}
 							>
-								<FolderSearch className="size-4" />
+								<FolderSearchIcon className="size-4" />
 								{browsing ? "Opening Drive…" : "Browse Google Drive"}
 							</Button>
 						) : (
@@ -290,7 +290,7 @@ export function OpenFromGoogle() {
 								className="flex items-center gap-1.5 text-xs text-muted-foreground"
 								role="status"
 							>
-								<Loader2 className="size-3 animate-spin" />
+								<Loader2Icon className="size-3 animate-spin" />
 								Importing…
 							</span>
 						) : null}
@@ -308,7 +308,7 @@ function ResultRow({
 	disabled,
 	onClick,
 }: {
-	icon: typeof FileSpreadsheet;
+	icon: typeof FileSpreadsheetIcon;
 	title: string;
 	subtitle: string | null;
 	disabled: boolean;
@@ -335,7 +335,7 @@ function ResultRow({
 			) : null}
 			{/* The ExternalLink icon that used to sit here was backwards: these
 			    rows import INTO this app, they don't open anything externally. */}
-			<Download className="size-3.5 shrink-0 text-muted-foreground" />
+			<DownloadIcon className="size-3.5 shrink-0 text-muted-foreground" />
 		</button>
 	);
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2Icon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { SheetsMark } from "@/components/brand/sheets-mark";
@@ -74,7 +74,7 @@ export function LoginForm({ next }: { next: string }) {
 						onClick={() => void signIn()}
 					>
 						{pending ? (
-							<Loader2 className="size-4 animate-spin" />
+							<Loader2Icon className="size-4 animate-spin" />
 						) : (
 							<GoogleIcon />
 						)}

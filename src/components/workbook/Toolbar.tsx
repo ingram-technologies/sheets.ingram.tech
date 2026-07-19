@@ -1,20 +1,20 @@
 "use client";
 
 import {
-	AlignCenter,
-	AlignLeft,
-	AlignRight,
-	Ban,
-	Bold,
-	Check,
-	ChevronDown,
-	Italic,
-	PaintBucket,
-	Redo2,
-	Strikethrough,
-	Type,
-	Underline,
-	Undo2,
+	AlignCenterIcon,
+	AlignLeftIcon,
+	AlignRightIcon,
+	BanIcon,
+	BoldIcon,
+	CheckIcon,
+	ChevronDownIcon,
+	ItalicIcon,
+	PaintBucketIcon,
+	Redo2Icon,
+	StrikethroughIcon,
+	TypeIcon,
+	UnderlineIcon,
+	Undo2Icon,
 } from "lucide-react";
 import { useSyncExternalStore } from "react";
 
@@ -101,14 +101,14 @@ export function Toolbar({ controller }: { controller: WorkbookController }) {
 				disabled={!model.canUndo()}
 				onClick={() => controller.mutate((m) => m.undo())}
 			>
-				<Undo2 className="size-4" />
+				<Undo2Icon className="size-4" />
 			</IconButton>
 			<IconButton
 				label="Redo (Ctrl+Y)"
 				disabled={!model.canRedo()}
 				onClick={() => controller.mutate((m) => m.redo())}
 			>
-				<Redo2 className="size-4" />
+				<Redo2Icon className="size-4" />
 			</IconButton>
 
 			<Separator orientation="vertical" className="mx-1 h-5" />
@@ -118,41 +118,41 @@ export function Toolbar({ controller }: { controller: WorkbookController }) {
 				active={style.font.b}
 				onClick={() => toggle("font.b", style.font.b)}
 			>
-				<Bold className="size-4" />
+				<BoldIcon className="size-4" />
 			</IconButton>
 			<IconButton
 				label="Italic (Ctrl+I)"
 				active={style.font.i}
 				onClick={() => toggle("font.i", style.font.i)}
 			>
-				<Italic className="size-4" />
+				<ItalicIcon className="size-4" />
 			</IconButton>
 			<IconButton
 				label="Underline (Ctrl+U)"
 				active={style.font.u}
 				onClick={() => toggle("font.u", style.font.u)}
 			>
-				<Underline className="size-4" />
+				<UnderlineIcon className="size-4" />
 			</IconButton>
 			<IconButton
 				label="Strikethrough"
 				active={style.font.strike}
 				onClick={() => toggle("font.strike", style.font.strike)}
 			>
-				<Strikethrough className="size-4" />
+				<StrikethroughIcon className="size-4" />
 			</IconButton>
 
 			<ColorMenu
 				label="Text colour"
 				tone="ink"
-				icon={<Type className="size-4" />}
+				icon={<TypeIcon className="size-4" />}
 				current={currentInk}
 				onPick={(color) => setStyle("font.color", color)}
 			/>
 			<ColorMenu
 				label="Fill colour"
 				tone="tint"
-				icon={<PaintBucket className="size-4" />}
+				icon={<PaintBucketIcon className="size-4" />}
 				current={currentTint}
 				onPick={(color) => setStyle("fill.fg_color", color)}
 			/>
@@ -164,21 +164,21 @@ export function Toolbar({ controller }: { controller: WorkbookController }) {
 				active={style.alignment?.horizontal === "left"}
 				onClick={() => setStyle("alignment.horizontal", "left")}
 			>
-				<AlignLeft className="size-4" />
+				<AlignLeftIcon className="size-4" />
 			</IconButton>
 			<IconButton
 				label="Align centre"
 				active={style.alignment?.horizontal === "center"}
 				onClick={() => setStyle("alignment.horizontal", "center")}
 			>
-				<AlignCenter className="size-4" />
+				<AlignCenterIcon className="size-4" />
 			</IconButton>
 			<IconButton
 				label="Align right"
 				active={style.alignment?.horizontal === "right"}
 				onClick={() => setStyle("alignment.horizontal", "right")}
 			>
-				<AlignRight className="size-4" />
+				<AlignRightIcon className="size-4" />
 			</IconButton>
 
 			<Separator orientation="vertical" className="mx-1 h-5" />
@@ -193,7 +193,7 @@ export function Toolbar({ controller }: { controller: WorkbookController }) {
 							className="h-7 shrink-0 gap-1 px-2 text-xs text-muted-foreground"
 						>
 							123
-							<ChevronDown className="size-3" />
+							<ChevronDownIcon className="size-3" />
 						</Button>
 					}
 				/>
@@ -207,7 +207,7 @@ export function Toolbar({ controller }: { controller: WorkbookController }) {
 							>
 								{/* A tick, not just a highlight — the menu has to
 								    answer "what format is this cell?" */}
-								<Check
+								<CheckIcon
 									className={cn(
 										"size-3.5 shrink-0",
 										active ? "opacity-100" : "opacity-0",
@@ -303,7 +303,7 @@ function ColorMenu({
 					onClick={() => onPick(AUTOMATIC_COLOR)}
 					className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
 				>
-					<Ban className="size-3.5 text-muted-foreground" />
+					<BanIcon className="size-3.5 text-muted-foreground" />
 					Automatic
 				</button>
 				<div className="grid grid-cols-5 gap-1 p-1">

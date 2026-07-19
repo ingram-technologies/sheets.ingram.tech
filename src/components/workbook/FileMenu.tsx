@@ -1,6 +1,12 @@
 "use client";
 
-import { ChevronDown, ExternalLink, FileDown, FileUp, Loader2 } from "lucide-react";
+import {
+	ChevronDownIcon,
+	ExternalLinkIcon,
+	FileDownIcon,
+	FileUpIcon,
+	Loader2Icon,
+} from "lucide-react";
 import { useState } from "react";
 import { z } from "zod";
 
@@ -122,10 +128,10 @@ export function FileMenu({
 						    export ran, with the label still reading "File" —
 						    indistinguishable from dead UI. */}
 							{busy ? (
-								<Loader2 className="size-3.5 animate-spin" />
+								<Loader2Icon className="size-3.5 animate-spin" />
 							) : null}
 							{busy ? "Working…" : "File"}
-							{busy ? null : <ChevronDown className="size-3.5" />}
+							{busy ? null : <ChevronDownIcon className="size-3.5" />}
 						</Button>
 					}
 				/>
@@ -139,7 +145,7 @@ export function FileMenu({
 							else void saveToGoogle();
 						}}
 					>
-						<FileUp className="size-4" />
+						<FileUpIcon className="size-4" />
 						{googleId
 							? "Save to linked Google Sheet"
 							: "Save to Google Sheets"}
@@ -154,13 +160,13 @@ export function FileMenu({
 								)
 							}
 						>
-							<ExternalLink className="size-4" />
+							<ExternalLinkIcon className="size-4" />
 							Open in Google Sheets
 						</DropdownMenuItem>
 					) : null}
 					<DropdownMenuSeparator />
 					<DropdownMenuItem onClick={() => void downloadXlsx()}>
-						<FileDown className="size-4" />
+						<FileDownIcon className="size-4" />
 						Download as Excel (.xlsx)
 					</DropdownMenuItem>
 				</DropdownMenuContent>

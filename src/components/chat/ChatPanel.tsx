@@ -6,7 +6,13 @@ import {
 	isToolUIPart,
 	lastAssistantMessageIsCompleteWithToolCalls,
 } from "ai";
-import { ArrowUp, CircleAlert, Loader2, Sparkles, Square } from "lucide-react";
+import {
+	ArrowUpIcon,
+	CircleAlertIcon,
+	Loader2Icon,
+	SparklesIcon,
+	SquareIcon,
+} from "lucide-react";
 import {
 	useCallback,
 	useEffect,
@@ -129,7 +135,7 @@ export function ChatPanel({ controller }: { controller: WorkbookController }) {
 	return (
 		<div className="flex h-full min-h-0 flex-col">
 			<div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3">
-				<Sparkles className="size-3.5 text-agent" />
+				<SparklesIcon className="size-3.5 text-agent" />
 				<span className="text-xs font-medium">Agent</span>
 				<AgentStatusChip controller={controller} busy={busy} />
 			</div>
@@ -207,9 +213,9 @@ export function ChatPanel({ controller }: { controller: WorkbookController }) {
 										className="flex items-center gap-1.5 px-1 text-xs text-muted-foreground"
 									>
 										{running ? (
-											<Loader2 className="size-3 shrink-0 animate-spin text-agent" />
+											<Loader2Icon className="size-3 shrink-0 animate-spin text-agent" />
 										) : failed ? (
-											<CircleAlert className="size-3 shrink-0 text-destructive-ink" />
+											<CircleAlertIcon className="size-3 shrink-0 text-destructive-ink" />
 										) : (
 											<span className="size-1.5 shrink-0 rounded-full bg-agent" />
 										)}
@@ -292,7 +298,7 @@ export function ChatPanel({ controller }: { controller: WorkbookController }) {
 							aria-label="Stop"
 							onClick={() => void stop()}
 						>
-							<Square className="size-3" />
+							<SquareIcon className="size-3" />
 						</Button>
 					) : (
 						<Button
@@ -302,7 +308,7 @@ export function ChatPanel({ controller }: { controller: WorkbookController }) {
 							disabled={!input.trim()}
 							aria-label="Send"
 						>
-							<ArrowUp className="size-4" />
+							<ArrowUpIcon className="size-4" />
 						</Button>
 					)}
 				</div>

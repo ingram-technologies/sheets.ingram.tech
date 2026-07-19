@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDownIcon, PlusIcon } from "lucide-react";
 import { useRef, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -128,7 +128,7 @@ export function SheetTabs({ controller }: { controller: WorkbookController }) {
 					);
 				}}
 			>
-				<Plus className="size-4" />
+				<PlusIcon className="size-4" />
 			</Button>
 
 			<div
@@ -181,7 +181,7 @@ export function SheetTabs({ controller }: { controller: WorkbookController }) {
 												aria-label={`Sheet ${sheet.name} menu`}
 												className="flex h-full items-center rounded-sm pr-1.5 pl-0.5"
 											>
-												<ChevronDown className="size-3" />
+												<ChevronDownIcon className="size-3" />
 											</button>
 										}
 									/>

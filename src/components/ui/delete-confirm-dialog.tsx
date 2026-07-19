@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2Icon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import type * as React from "react";
 
@@ -122,9 +122,9 @@ export function DeleteConfirmDialog({
 						disabled={!matches || pending}
 					>
 						{pending ? (
-							<Loader2 className="size-4 animate-spin" />
+							<Loader2Icon className="size-4 animate-spin" />
 						) : (
-							<Trash2 className="size-4" />
+							<Trash2Icon className="size-4" />
 						)}
 						{confirmLabel}
 					</Button>
