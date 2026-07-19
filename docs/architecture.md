@@ -199,8 +199,8 @@ non-sensitive `drive.file` instead. Richer style transfer is a follow-up.
   author, color, note, resolved) so highlights thread into per-range discussions
   and the agent reads user highlights as input. The schema has exactly one table
   (`workbook`) today.
-- **csv + xlsx import** — xlsx *export* and the Google Sheets bridge exist
-  client-side; file imports arrive with sheetd (server-side import keeps the
-  client thin).
+- **xlsx import** — xlsx *export*, CSV/TSV *import* (`src/lib/csv.ts` →
+  `modelFromSnapshot`, fully client-side), and the Google Sheets bridge exist;
+  xlsx import arrives with sheetd (server-side import keeps the client thin).
 - **Frozen panes, merged cells, borders UI, wrap text** — engine supports them;
   renderer/toolbar don't yet.
