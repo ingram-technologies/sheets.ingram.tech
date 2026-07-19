@@ -108,6 +108,10 @@ export async function POST(request: Request) {
 				description: AGENT_TOOL_DESCRIPTIONS.rename_sheet,
 				inputSchema: agentToolSchemas.rename_sheet,
 			},
+			rename_workbook: {
+				description: AGENT_TOOL_DESCRIPTIONS.rename_workbook,
+				inputSchema: agentToolSchemas.rename_workbook,
+			},
 			undo: {
 				description: AGENT_TOOL_DESCRIPTIONS.undo,
 				inputSchema: agentToolSchemas.undo,

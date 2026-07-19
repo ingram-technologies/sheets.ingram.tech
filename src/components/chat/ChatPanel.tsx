@@ -41,6 +41,7 @@ const TOOL_LABELS: Record<AgentToolName, string> = {
 	modify_structure: "Restructuring",
 	add_sheet: "Adding sheet",
 	rename_sheet: "Renaming sheet",
+	rename_workbook: "Renaming workbook",
 	undo: "Undoing",
 	highlight_cells: "Highlighting",
 };
@@ -58,8 +59,17 @@ function isAgentToolName(name: string): name is AgentToolName {
 	return name in agentToolSchemas;
 }
 
-export function ChatPanel({ controller }: { controller: WorkbookController }) {
-	const executor = useMemo(() => new AgentExecutor(controller), [controller]);
+export function ChatPanel({
+	controller,
+	renameDocument,
+}: {
+	controller: WorkbookController;
+	renameDocument?: (name: string) => Promise<boolean>;
+}) {
+	const executor = useMemo(
+		() => new AgentExecutor(controller, renameDocument),
+		[controller, renameDocument],
+	);
 	const [input, setInput] = useState("");
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	// Whether the view is pinned to the newest message. Only then does new

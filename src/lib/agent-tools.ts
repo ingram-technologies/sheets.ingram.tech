@@ -90,6 +90,13 @@ export const agentToolSchemas = {
 		sheet: sheetName,
 		new_name: z.string(),
 	}),
+	rename_workbook: z.object({
+		name: z
+			.string()
+			.min(1)
+			.max(200)
+			.describe("New name for the whole workbook — the document/file name."),
+	}),
 	undo: z.object({}),
 	highlight_cells: z.object({
 		sheet: sheetName,
@@ -123,6 +130,8 @@ export const AGENT_TOOL_DESCRIPTIONS: Record<AgentToolName, string> = {
 	modify_structure: "Insert or delete whole rows or columns.",
 	add_sheet: "Add a new sheet to the workbook.",
 	rename_sheet: "Rename a sheet.",
+	rename_workbook:
+		"Rename the whole workbook — its document/file name, shown in the header and the file list. Use rename_sheet for an individual tab instead.",
 	undo: "Undo the last change made to the workbook.",
 	highlight_cells:
 		"Visually highlight a range for the user with a note — the shared pointing finger. Use it to flag anomalies or ask about specific cells.",

@@ -24,11 +24,17 @@ const OVERVIEW_DENSE_CAP = 400;
 const ECHO_LINE_CAP = 30;
 
 export class AgentExecutor {
-	constructor(private controller: WorkbookController) {}
+	constructor(
+		private controller: WorkbookController,
+		// Renaming the whole workbook is server-side metadata, not an engine op,
+		// so it's injected by the host (Workbook) rather than done on the model.
+		// Returns whether the rename was persisted.
+		private renameDocument?: (name: string) => Promise<boolean>,
+	) {}
 
 	async execute(name: AgentToolName, input: unknown): Promise<string> {
 		try {
-			return this.dispatch(name, input);
+			return await this.dispatch(name, input);
 		} catch (error) {
 			return `error: ${error instanceof Error ? error.message : String(error)}`;
 		} finally {
@@ -36,7 +42,7 @@ export class AgentExecutor {
 		}
 	}
 
-	private dispatch(name: AgentToolName, input: unknown): string {
+	private dispatch(name: AgentToolName, input: unknown): string | Promise<string> {
 		// Re-validate here so the executor is safe regardless of transport.
 		switch (name) {
 			case "get_workbook_overview":
@@ -59,6 +65,10 @@ export class AgentExecutor {
 				return this.addSheet(agentToolSchemas.add_sheet.parse(input));
 			case "rename_sheet":
 				return this.renameSheet(agentToolSchemas.rename_sheet.parse(input));
+			case "rename_workbook":
+				return this.renameWorkbook(
+					agentToolSchemas.rename_workbook.parse(input),
+				);
 			case "undo":
 				return this.undo();
 			case "highlight_cells":
@@ -274,6 +284,20 @@ export class AgentExecutor {
 		return result.ok
 			? `ok — renamed to '${input.new_name}'`
 			: `error: ${result.error}`;
+	}
+
+	private async renameWorkbook(
+		input: AgentToolInput<"rename_workbook">,
+	): Promise<string> {
+		if (!this.renameDocument) {
+			return "error: renaming the workbook isn't available here";
+		}
+		const next = input.name.trim();
+		if (!next) return "error: name is empty";
+		const ok = await this.renameDocument(next);
+		return ok
+			? `ok — renamed the workbook to '${next}'`
+			: "error: the workbook rename was rejected";
 	}
 
 	private undo(): string {

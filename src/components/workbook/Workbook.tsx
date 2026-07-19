@@ -123,6 +123,33 @@ export function Workbook({
 		[controller, id],
 	);
 
+	// Rename the whole document — shared by the header field and the agent's
+	// rename_workbook tool. Optimistic with rollback; returns whether it stuck
+	// so the agent can report honestly.
+	const renameDocument = useCallback(
+		async (next: string): Promise<boolean> => {
+			const trimmed = next.trim();
+			if (!trimmed) return false;
+			if (trimmed === name) return true;
+			const previous = name;
+			setName(trimmed);
+			try {
+				const response = await fetch(`/api/workbooks/${id}`, {
+					method: "PATCH",
+					headers: { "content-type": "application/json" },
+					body: JSON.stringify({ name: trimmed }),
+				});
+				if (!response.ok) throw new Error(String(response.status));
+				return true;
+			} catch {
+				setName(previous);
+				toast.error("Couldn't rename the workbook");
+				return false;
+			}
+		},
+		[id, name],
+	);
+
 	// Debounced autosave on every content mutation.
 	useEffect(() => {
 		if (!controller) return;
@@ -188,7 +215,7 @@ export function Workbook({
 				</Link>
 				{/* The brand mark, not a generic grid glyph — login already uses it. */}
 				<SheetsMark className="size-4 shrink-0 text-primary" />
-				<WorkbookName id={id} name={name} setName={setName} />
+				<WorkbookName name={name} rename={renameDocument} />
 				<FileMenu
 					controller={controller}
 					workbookId={id}
@@ -245,7 +272,10 @@ export function Workbook({
 								aria-label="Agent"
 								className="absolute inset-y-0 right-0 z-[var(--z-sticky)] w-80 max-w-[85vw] border-l border-border bg-background md:static md:z-auto md:w-80 md:max-w-none xl:w-96"
 							>
-								<ChatPanel controller={controller} />
+								<ChatPanel
+									controller={controller}
+									renameDocument={renameDocument}
+								/>
 							</aside>
 						) : null}
 					</div>
@@ -300,15 +330,19 @@ function SaveIndicator({ state, onRetry }: { state: SaveState; onRetry: () => vo
 }
 
 function WorkbookName({
-	id,
 	name,
-	setName,
+	rename,
 }: {
-	id: string;
 	name: string;
-	setName: (name: string) => void;
+	rename: (next: string) => Promise<boolean>;
 }) {
 	const [value, setValue] = useState(name);
+
+	// Reflect renames that land from elsewhere — the agent's rename_workbook
+	// tool, or a rollback — into the editable field.
+	useEffect(() => {
+		setValue(name);
+	}, [name]);
 
 	const commit = async () => {
 		const next = value.trim();
@@ -316,22 +350,9 @@ function WorkbookName({
 			setValue(next || name);
 			return;
 		}
-		const previous = name;
-		setName(next);
-		try {
-			const response = await fetch(`/api/workbooks/${id}`, {
-				method: "PATCH",
-				headers: { "content-type": "application/json" },
-				body: JSON.stringify({ name: next }),
-			});
-			if (!response.ok) throw new Error(String(response.status));
-		} catch {
-			// Roll back rather than leave the header showing a name the server
-			// never accepted.
-			setName(previous);
-			setValue(previous);
-			toast.error("Couldn't rename the workbook");
-		}
+		// rename is optimistic and rolls the name back on failure; the effect
+		// above then resyncs this field, so nothing extra to handle here.
+		await rename(next);
 	};
 
 	return (
