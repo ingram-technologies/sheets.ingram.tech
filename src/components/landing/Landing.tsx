@@ -197,9 +197,9 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
 						No sharing, no roles, no view links. A workbook is reachable by
 						its owner or by nobody.
 					</Limit>
-					<Limit term="Imports are thin.">
-						xlsx export and Google Sheets import work today; CSV and xlsx
-						import don&apos;t yet.
+					<Limit term="No xlsx import yet.">
+						CSV import, xlsx export, and a Google Sheets bridge work today;
+						xlsx import doesn&apos;t yet.
 					</Limit>
 					<Limit term="Some engine features aren&rsquo;t wired up.">
 						Frozen panes, merged cells, and borders exist in the engine but
