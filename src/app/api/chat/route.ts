@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { AGENT_TOOL_DESCRIPTIONS, agentToolSchemas } from "@/lib/agent-tools";
 import { icShimFetch } from "@/lib/ic-stream-shim";
+import { smithExternalId } from "@/lib/ingram-cloud";
 import { requireApiUser } from "@/lib/session";
 
 export const maxDuration = 120;
@@ -64,7 +65,9 @@ export async function POST(request: Request) {
 		messages: await convertToModelMessages(
 			withWorkbookState(messages, parsed.data.overview),
 		),
-		providerOptions: { openai: { user: `user:${gate.userId}` } },
+		// Single-sourced with the management-plane `external_id` so a BYOK key set
+		// on the smith and this run resolve to the SAME smith (cloud#170).
+		providerOptions: { openai: { user: smithExternalId(gate.userId) } },
 		stopWhen: stepCountIs(24),
 		// All tools execute client-side against the in-browser engine — no
 		// execute functions here; calls are forwarded to the browser.

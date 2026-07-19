@@ -23,22 +23,32 @@ function client(): IngramCloud {
 }
 
 /**
- * Resolve — or lazily create — the smith that backs one app user, keyed on our
- * Better Auth user id as the smith's `external_id`. Idempotent: it lists by
- * `external_id` and creates only on a miss.
+ * The identity string that names one user's smith.
  *
- * NOTE: the chat route currently provisions smiths implicitly via the ai-sdk
- * `user` field. Before this explicit path drives live inference, confirm both
- * resolve to the SAME smith (external_id alignment) against a real tenant —
- * otherwise a user ends up with two smiths.
+ * It MUST be byte-identical everywhere the smith is addressed: the ai-sdk
+ * `user` field the chat route sends (data-plane lazy provisioning) and the
+ * `external_id` we upsert here (management plane). Both go through IC's single
+ * `provisionSmith`, keyed on `(external_id, agent)` behind a unique constraint,
+ * so an aligned string guarantees the two paths converge on ONE smith — a key
+ * set before the first chat lands on exactly the smith that chat runs as
+ * (cloud.ingram.tech#170).
+ *
+ * Assumes IC stores the OpenAI-compat `user` value verbatim as external_id;
+ * verify that mapping against a live tenant before flipping the flag on.
+ */
+export function smithExternalId(userId: string): string {
+	return `user:${userId}`;
+}
+
+/**
+ * Ensure the user's smith exists and return it (with its `smt_` id). Idempotent
+ * upsert on `(external_id, agent)` — `POST /v1/smiths` is 200-if-exists /
+ * 201-if-created, needs no run and no published agent (cloud.ingram.tech#170).
  */
 export async function resolveUserSmith(userId: string): Promise<ICSmith> {
 	const ic = client();
-	const page = await ic.smiths.list({ external_id: userId, limit: 1 });
-	const existing = page.data.at(0);
-	if (existing) return existing;
 	return ic.smiths.create({
-		external_id: userId,
+		external_id: smithExternalId(userId),
 		agent_id: process.env.IC_AGENT_ID ?? undefined,
 	});
 }
