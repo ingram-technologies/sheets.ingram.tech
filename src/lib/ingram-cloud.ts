@@ -14,7 +14,7 @@
 import { IngramCloud } from "@ingram-cloud/sdk/client";
 import type { ICSmith } from "@ingram-cloud/sdk/responses";
 
-import type { InferenceProvider } from "./inference-prefs";
+import { INFERENCE_PROVIDERS, type InferenceProvider } from "./inference-prefs";
 
 function client(): IngramCloud {
 	const token = process.env.INGRAM_CLOUD_TOKEN;
@@ -53,39 +53,51 @@ export async function resolveUserSmith(userId: string): Promise<ICSmith> {
 	});
 }
 
-/** Thrown while smith-level model keys are not yet enabled on the platform. */
-export class ByokPendingError extends Error {
-	constructor() {
-		super("Per-user provider keys are not enabled yet (cloud.ingram.tech#170)");
-		this.name = "ByokPendingError";
-	}
-}
-
 /**
- * Store an end user's own provider key ON THEIR SMITH, so that user's inference
- * bills to them, not our tenant.
+ * Store an end user's own provider key ON THEIR SMITH (cloud.ingram.tech#170),
+ * so that user's inference bills to their provider account, not our tenant. IC
+ * resolves smith → tenant → hosted at run time, so once this is set the user's
+ * chats (which already run as this smith) bill to them with no further wiring.
  *
- * Flag-guarded: `smiths.modelKeys` does not exist on the platform yet
- * (cloud.ingram.tech#170). Set `IC_SMITH_MODEL_KEYS_ENABLED=true` once the
- * endpoint ships. Until then this throws {@link ByokPendingError} and the key
- * is never sent anywhere — the wizard holds it in the browser.
+ * The key is handed straight to Ingram Cloud and never persisted by us. A key
+ * that is present but rejected surfaces as the provider's auth error on the
+ * user's next run — IC deliberately does NOT fall back to the tenant key.
  */
 export async function setUserProviderKey(args: {
 	userId: string;
 	provider: InferenceProvider;
 	apiKey: string;
 }): Promise<{ smithId: string }> {
-	if (process.env.IC_SMITH_MODEL_KEYS_ENABLED !== "true") {
-		throw new ByokPendingError();
-	}
 	const ic = client();
 	const smith = await resolveUserSmith(args.userId);
-	// The typed client gains `ic.smiths.modelKeys.put` once #170 lands; until
-	// then reach the (mirrored-from-tenant) endpoint via the raw request seam.
-	await ic.request(
-		"PUT",
-		`/smiths/${encodeURIComponent(smith.id)}/model_keys/${args.provider}`,
-		{ smith: smith.id, body: { api_key: args.apiKey } },
-	);
+	await ic.smiths.modelKeys.put(smith.id, args.provider, {
+		api_key: args.apiKey,
+	});
 	return { smithId: smith.id };
+}
+
+/** Which providers this user has a smith-level key for (presence only — keys
+ *  are never read back). */
+export async function listUserProviderKeys(
+	userId: string,
+): Promise<InferenceProvider[]> {
+	const ic = client();
+	const smith = await resolveUserSmith(userId);
+	const keys = await ic.smiths.modelKeys.list(smith.id);
+	return keys
+		.map((key) => key.provider)
+		.filter((provider): provider is InferenceProvider =>
+			(INFERENCE_PROVIDERS as readonly string[]).includes(provider),
+		);
+}
+
+/** Remove a user's own key for one provider — their runs fall back to the
+ *  tenant/hosted key again. */
+export async function clearUserProviderKey(
+	userId: string,
+	provider: InferenceProvider,
+): Promise<void> {
+	const ic = client();
+	const smith = await resolveUserSmith(userId);
+	await ic.smiths.modelKeys.delete(smith.id, provider);
 }

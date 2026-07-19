@@ -1,12 +1,11 @@
 /**
  * Client-side inference preferences.
  *
- * Ingram Sheets' agent runs on Claude via Ingram Cloud. Until per-user (smith-
- * level) provider keys ship on the platform (cloud.ingram.tech#170), a user's
- * own key can't yet be routed through Ingram Cloud, so the setup wizard records
- * the user's choice here and holds the key in this browser only — no server
- * custody. When #170 lands the key is replayed to `/api/inference/byok`, which
- * PUTs it onto the user's smith so their inference bills to them.
+ * Ingram Sheets' agent runs on Claude via Ingram Cloud. The setup wizard sends
+ * a bring-your-own-key user's key to `/api/inference/byok`, which PUTs it onto
+ * their smith (cloud.ingram.tech#170) so their inference bills to them. The raw
+ * key is NEVER stored here — only the user's choice and a masked hint, so this
+ * browser can show what's configured without holding a secret.
  *
  * Kept free of any `@ingram-cloud/sdk` import so it stays client-safe (the SDK
  * carries the tenant token seam and must never reach the browser bundle).
@@ -47,8 +46,8 @@ export type InferenceMode = "hosted" | "byok";
 export interface InferencePrefs {
 	mode: InferenceMode;
 	provider?: InferenceProvider;
-	/** Present only for `byok`; browser-only until #170 (see file header). */
-	apiKey?: string;
+	/** Masked last-4 hint for `byok` (e.g. `••••a1b2`) — never the raw key. */
+	keyHint?: string;
 	configuredAt: string;
 }
 
@@ -76,7 +75,7 @@ export function loadInferencePrefs(): InferencePrefs | null {
 		return {
 			mode,
 			provider: isProvider(record.provider) ? record.provider : undefined,
-			apiKey: typeof record.apiKey === "string" ? record.apiKey : undefined,
+			keyHint: typeof record.keyHint === "string" ? record.keyHint : undefined,
 			configuredAt:
 				typeof record.configuredAt === "string"
 					? record.configuredAt
