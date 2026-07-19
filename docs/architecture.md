@@ -79,10 +79,16 @@ renderer reads `getSelectedView()` each frame.
 
 ## The agent loop
 
-- `/api/chat` (`src/app/api/chat/route.ts`): AI SDK `streamText` against the
-  Anthropic API directly (`ANTHROPIC_API_KEY`, `SHEETS_CHAT_MODEL`). Tools are
-  declared **without `execute`** — the SDK forwards calls to the browser.
-  `stopWhen: stepCountIs(24)` caps a single turn's tool loop.
+- `/api/chat` (`src/app/api/chat/route.ts`): AI SDK `streamText` against
+  **Ingram Cloud** (`@ingram-cloud/ai-sdk`; tenant token + `IC-Agent-Id`, model
+  from the IC agent config, `SHEETS_CHAT_MODEL` overrides). IC lazily
+  provisions one smith per user (`user:<better-auth-id>`); per-user BYOK
+  attaches the user's provider key to that smith so their inference bills to
+  them (`src/lib/ingram-cloud.ts`, cloud.ingram.tech#170). A temporary SSE
+  shim (`src/lib/ic-stream-shim.ts`) normalizes the stream until
+  cloud.ingram.tech#165 lands. Tools are declared **without `execute`** — the
+  SDK forwards calls to the browser. `stopWhen: stepCountIs(24)` caps a single
+  turn's tool loop.
 - `src/components/chat/ChatPanel.tsx` runs `onToolCall` → `AgentExecutor`
   (`src/components/workbook/agent-executor.ts`), which executes against the
   controller and returns a text result via `addToolOutput`;

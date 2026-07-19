@@ -165,9 +165,9 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
 						hands them back.
 					</Beat>
 					<Beat title="The agent’s tools run there too">
-						Chat streams from the Anthropic API, but the tool calls the
-						model makes execute in your browser, against the same document
-						you&apos;re editing.
+						Chat runs on Claude, hosted or on your own API key — but the
+						tool calls the model makes execute in your browser, against the
+						same document you&apos;re editing.
 					</Beat>
 					<Beat title="You watch it happen">
 						The agent focuses a range, switches to the sheet it&apos;s

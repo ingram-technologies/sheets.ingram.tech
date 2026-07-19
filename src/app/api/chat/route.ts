@@ -10,7 +10,8 @@ import { requireApiUser } from "@/lib/session";
 
 export const maxDuration = 120;
 
-// Ingram Cloud runs inference (BYOK: our Anthropic key, wired in infra). ""
+// Ingram Cloud runs inference — hosted keys by default, or the user's own key
+// when they've attached one to their smith (see lib/ingram-cloud.ts). ""
 // means the IC agent's configured model (claude-opus-4-8, owned by the sheets
 // Pulumi stack); set SHEETS_CHAT_MODEL to override per-deployment.
 const MODEL = process.env.SHEETS_CHAT_MODEL ?? "";
