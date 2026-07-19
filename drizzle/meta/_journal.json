@@ -36,6 +36,13 @@
 			"when": 1784134161957,
 			"tag": "0004_workbook_owner",
 			"breakpoints": true
+		},
+		{
+			"idx": 5,
+			"version": "7",
+			"when": 1784482014626,
+			"tag": "0005_workbook_soft_delete",
+			"breakpoints": true
 		}
 	]
 }

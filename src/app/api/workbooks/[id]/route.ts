@@ -1,7 +1,12 @@
 import { z } from "zod";
 
 import { requireApiUser } from "@/lib/session";
-import { deleteWorkbook, getWorkbookMeta, renameWorkbook } from "@/lib/workbooks";
+import {
+	deleteWorkbookPermanently,
+	getWorkbookMeta,
+	renameWorkbook,
+	trashWorkbook,
+} from "@/lib/workbooks";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -32,11 +37,16 @@ export async function PATCH(request: Request, { params }: Params) {
 	return Response.json(meta);
 }
 
-export async function DELETE(_request: Request, { params }: Params) {
+export async function DELETE(request: Request, { params }: Params) {
 	const gate = await requireApiUser();
 	if ("response" in gate) return gate.response;
 	const { id } = await params;
-	const deleted = await deleteWorkbook(id, gate.userId);
-	if (!deleted) return Response.json({ error: "not found" }, { status: 404 });
+	// Default: move to trash (recoverable). `?permanent=true` erases a workbook
+	// that is already in the trash — a live one can't be destroyed in one step.
+	const permanent = new URL(request.url).searchParams.get("permanent") === "true";
+	const done = permanent
+		? await deleteWorkbookPermanently(id, gate.userId)
+		: await trashWorkbook(id, gate.userId);
+	if (!done) return Response.json({ error: "not found" }, { status: 404 });
 	return new Response(null, { status: 204 });
 }

@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db, schema } from "./db";
@@ -11,6 +11,8 @@ export const workbookMetaSchema = z.object({
 	googleSpreadsheetId: z.string().nullable(),
 	createdAt: z.iso.datetime(),
 	updatedAt: z.iso.datetime(),
+	// Set only for trashed workbooks; null for live ones.
+	deletedAt: z.iso.datetime().nullable(),
 });
 
 export type WorkbookMeta = z.infer<typeof workbookMetaSchema>;
@@ -22,6 +24,7 @@ const metaColumns = {
 	googleSpreadsheetId: schema.workbooks.googleSpreadsheetId,
 	createdAt: schema.workbooks.createdAt,
 	updatedAt: schema.workbooks.updatedAt,
+	deletedAt: schema.workbooks.deletedAt,
 };
 
 // The id codec lives at this boundary: rows carry UUIDv7, everything returned
@@ -37,6 +40,7 @@ function toMeta(row: {
 	googleSpreadsheetId: string | null;
 	createdAt: Date;
 	updatedAt: Date;
+	deletedAt: Date | null;
 }): WorkbookMeta {
 	return {
 		id: ids.workbook.encode(row.id),
@@ -45,6 +49,7 @@ function toMeta(row: {
 		googleSpreadsheetId: row.googleSpreadsheetId,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
+		deletedAt: row.deletedAt ? row.deletedAt.toISOString() : null,
 	};
 }
 
@@ -59,15 +64,41 @@ function toMeta(row: {
  * ids are enumerable-ish. Callers turn null into a 404.
  */
 function owned(uuid: string, userId: string) {
-	return and(eq(schema.workbooks.id, uuid), eq(schema.workbooks.userId, userId));
+	return and(
+		eq(schema.workbooks.id, uuid),
+		eq(schema.workbooks.userId, userId),
+		// Live rows only: a trashed workbook is treated as missing by every
+		// read/write. Trash-specific queries below opt back in explicitly.
+		isNull(schema.workbooks.deletedAt),
+	);
 }
 
 export async function listWorkbooks(userId: string): Promise<WorkbookMeta[]> {
 	const rows = await db
 		.select(metaColumns)
 		.from(schema.workbooks)
-		.where(eq(schema.workbooks.userId, userId))
+		.where(
+			and(
+				eq(schema.workbooks.userId, userId),
+				isNull(schema.workbooks.deletedAt),
+			),
+		)
 		.orderBy(desc(schema.workbooks.updatedAt));
+	return rows.map(toMeta);
+}
+
+/** The owner's trashed workbooks, most-recently-deleted first. */
+export async function listDeletedWorkbooks(userId: string): Promise<WorkbookMeta[]> {
+	const rows = await db
+		.select(metaColumns)
+		.from(schema.workbooks)
+		.where(
+			and(
+				eq(schema.workbooks.userId, userId),
+				isNotNull(schema.workbooks.deletedAt),
+			),
+		)
+		.orderBy(desc(schema.workbooks.deletedAt));
 	return rows.map(toMeta);
 }
 
@@ -158,12 +189,53 @@ export async function renameWorkbook(
 	return row ? toMeta(row) : null;
 }
 
-export async function deleteWorkbook(id: string, userId: string): Promise<boolean> {
+/** Move a live workbook to the trash (recoverable). */
+export async function trashWorkbook(id: string, userId: string): Promise<boolean> {
+	const uuid = ids.workbook.decodeOrNull(id);
+	if (!uuid) return false;
+	const rows = await db
+		.update(schema.workbooks)
+		.set({ deletedAt: new Date() })
+		.where(owned(uuid, userId))
+		.returning({ id: schema.workbooks.id });
+	return rows.length > 0;
+}
+
+/** Restore a trashed workbook back to the live list. */
+export async function restoreWorkbook(id: string, userId: string): Promise<boolean> {
+	const uuid = ids.workbook.decodeOrNull(id);
+	if (!uuid) return false;
+	const rows = await db
+		.update(schema.workbooks)
+		.set({ deletedAt: null })
+		.where(
+			and(
+				eq(schema.workbooks.id, uuid),
+				eq(schema.workbooks.userId, userId),
+				isNotNull(schema.workbooks.deletedAt),
+			),
+		)
+		.returning({ id: schema.workbooks.id });
+	return rows.length > 0;
+}
+
+/** Permanently erase a workbook. Only a *trashed* one can be hard-deleted, so a
+ *  live workbook can never be destroyed in a single step. */
+export async function deleteWorkbookPermanently(
+	id: string,
+	userId: string,
+): Promise<boolean> {
 	const uuid = ids.workbook.decodeOrNull(id);
 	if (!uuid) return false;
 	const rows = await db
 		.delete(schema.workbooks)
-		.where(owned(uuid, userId))
+		.where(
+			and(
+				eq(schema.workbooks.id, uuid),
+				eq(schema.workbooks.userId, userId),
+				isNotNull(schema.workbooks.deletedAt),
+			),
+		)
 		.returning({ id: schema.workbooks.id });
 	return rows.length > 0;
 }

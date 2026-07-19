@@ -41,6 +41,10 @@ export const workbooks = pgTable(
 		updatedAt: timestamp("updated_at", { withTimezone: true })
 			.notNull()
 			.defaultNow(),
+		// Soft delete: a "Deleted" workbook moves to the trash (recoverable)
+		// rather than being erased. NULL = live; a timestamp = when it was
+		// trashed. Every active read/write filters on IS NULL (see lib/workbooks).
+		deletedAt: timestamp("deleted_at", { withTimezone: true }),
 	},
 	(table) => [
 		// Serves the only list query: this owner's workbooks, newest first.
