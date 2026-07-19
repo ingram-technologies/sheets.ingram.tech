@@ -54,11 +54,6 @@ export function SetupWizard() {
 		if (loadInferencePrefs() === null) setOpen(true);
 	}, []);
 
-	const chooseHosted = () => {
-		saveInferencePrefs({ mode: "hosted", configuredAt: new Date().toISOString() });
-		setOpen(false);
-	};
-
 	const saveKey = async () => {
 		const trimmed = apiKey.trim();
 		if (!trimmed || saving) return;
@@ -100,8 +95,11 @@ export function SetupWizard() {
 	};
 
 	return (
-		<Dialog open={open} onOpenChange={setOpen}>
-			<DialogContent className="max-w-md gap-5">
+		// Required gate: ignore backdrop/esc close attempts and hide the corner
+		// X — the only way out is choosing how the agent is powered. It closes
+		// only via the explicit setOpen(false) on a successful save.
+		<Dialog open={open} onOpenChange={(next) => next && setOpen(true)}>
+			<DialogContent hideClose className="max-w-md gap-5">
 				{step === "choose" ? (
 					<div
 						key="choose"
@@ -130,14 +128,6 @@ export function SetupWizard() {
 								disabled
 							/>
 						</div>
-
-						<button
-							type="button"
-							onClick={chooseHosted}
-							className="w-full rounded-md py-1 text-center text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-						>
-							Not now — use the shared allowance
-						</button>
 					</div>
 				) : (
 					<form

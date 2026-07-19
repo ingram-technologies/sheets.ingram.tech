@@ -41,7 +41,10 @@ export function maskKey(key: string): string {
 	return trimmed.length <= 4 ? "••••" : `••••${trimmed.slice(-4)}`;
 }
 
-export type InferenceMode = "hosted" | "byok";
+// Choosing how the agent is powered is NOT optional — the setup gate blocks the
+// app until one is set. `paid` (a funded balance through Ingram Cloud) is the
+// phase-2 option; today only `byok` can actually be selected.
+export type InferenceMode = "byok" | "paid";
 
 export interface InferencePrefs {
 	mode: InferenceMode;
@@ -71,7 +74,7 @@ export function loadInferencePrefs(): InferencePrefs | null {
 		if (typeof parsed !== "object" || parsed === null) return null;
 		const record: Record<string, unknown> = { ...parsed };
 		const mode = record.mode;
-		if (mode !== "hosted" && mode !== "byok") return null;
+		if (mode !== "byok" && mode !== "paid") return null;
 		return {
 			mode,
 			provider: isProvider(record.provider) ? record.provider : undefined,
