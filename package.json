@@ -25,6 +25,7 @@
 		"@base-ui/react": "^1.6.0",
 		"@better-auth/passkey": "^1.6.23",
 		"@ingram-cloud/ai-sdk": "^2.0.0",
+		"@ingram-cloud/sdk": "^1.2.0",
 		"@ingram-tech/nk-auth": "^0.12.3",
 		"@ingram-tech/nk-db": "^1.4.1",
 		"@ironcalc/wasm": "file:vendor/ironcalc-wasm",

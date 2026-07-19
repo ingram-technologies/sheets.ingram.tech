@@ -36,6 +36,7 @@ import {
 import { toast } from "@/components/ui/toaster";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { OpenFromGoogle } from "@/components/files/OpenFromGoogle";
+import { SetupWizard } from "@/components/inference/SetupWizard";
 import { ensureIronCalc, Model } from "@/components/workbook/ironcalc";
 import { bytesToBase64 } from "@/lib/bytes";
 import type { WorkbookMeta } from "@/lib/workbooks";
@@ -109,6 +110,7 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 
 	return (
 		<main className="mx-auto w-full max-w-4xl px-6 py-10">
+			<SetupWizard />
 			<PageHeader
 				icon={SheetsMark}
 				iconClassName="bg-primary/10 text-primary"
