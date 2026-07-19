@@ -248,6 +248,20 @@
 
 @layer base {
 	/*
+	 * Default border colour. Tailwind v4 dropped v3's preflight that reset every
+	 * element's border to gray-200, so a bare `border` / `border-b` now paints in
+	 * `currentColor` — which on charcoal chrome is the near-white ink, producing
+	 * jarring white hairlines (table row separators, dialog outline, dropdowns).
+	 * Repoint the default to the `--border` token so width-only borders land on
+	 * the charcoal hairline; explicit `border-<colour>` utilities still win.
+	 */
+	*,
+	*::before,
+	*::after {
+		border-color: var(--color-border);
+	}
+
+	/*
 	 * Spreadsheet chrome is dense and keyboard-first: a visible focus ring is
 	 * the difference between usable and unusable. Base UI primitives ship
 	 * their own `focus-visible` styles; this covers the hand-rolled controls
