@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOutIcon } from "lucide-react";
+import { KeyRoundIcon, LogOutIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -13,7 +13,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth-client";
 
-export function UserMenu() {
+export function UserMenu({
+	onOpenInferenceSettings,
+}: {
+	/** When provided, adds an "Inference key" item (the home surface passes it;
+	 *  the workbook header omits it). */
+	onOpenInferenceSettings?: () => void;
+} = {}) {
 	const router = useRouter();
 	const { data: session, isPending } = authClient.useSession();
 	const [imageFailed, setImageFailed] = useState(false);
@@ -68,6 +74,12 @@ export function UserMenu() {
 					</p>
 				</div>
 				<DropdownMenuSeparator />
+				{onOpenInferenceSettings ? (
+					<DropdownMenuItem onClick={onOpenInferenceSettings}>
+						<KeyRoundIcon className="size-4" />
+						Inference key
+					</DropdownMenuItem>
+				) : null}
 				<DropdownMenuItem
 					onClick={() =>
 						void authClient.signOut({

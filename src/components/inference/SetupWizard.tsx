@@ -22,7 +22,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toaster";
 import {
+	clearInferencePrefs,
 	INFERENCE_PROVIDERS,
+	type InferencePrefs,
 	type InferenceProvider,
 	keyLooksValid,
 	loadInferencePrefs,
@@ -35,24 +37,52 @@ import { cn } from "@/lib/utils";
 type Step = "choose" | "key";
 
 /**
- * First-run setup: who pays for the agent's inference. Bring-your-own-key
- * attaches the user's provider key to their smith (cloud.ingram.tech#170), so
- * their chats bill to their own account; pay-as-you-go (a funded balance
- * through Ingram Cloud) is the phase-2 option. Self-gates on localStorage — it
- * shows once, until a choice is made — and never holds the raw key.
+ * Setup + settings for how the agent is powered. Bring-your-own-key attaches
+ * the user's provider key to their smith (cloud.ingram.tech#170), so their
+ * chats bill to their own account; pay-as-you-go (a funded Ingram Cloud
+ * balance) is the phase-2 option.
+ *
+ * Two ways in: as a **required first-run gate** (no props) it self-gates on
+ * localStorage and can't be dismissed until a choice is made; as **settings**
+ * (`manage`) it's an ordinary dismissible dialog that also shows the current
+ * key and lets the user replace or remove it. The raw key is never stored here.
  */
-export function SetupWizard() {
-	const [open, setOpen] = useState(false);
+export function SetupWizard({
+	manage,
+}: {
+	manage?: { open: boolean; onOpenChange: (open: boolean) => void };
+} = {}) {
+	const [gateOpen, setGateOpen] = useState(false);
 	const [step, setStep] = useState<Step>("choose");
 	const [provider, setProvider] = useState<InferenceProvider>("anthropic");
 	const [apiKey, setApiKey] = useState("");
 	const [saving, setSaving] = useState(false);
+	const [current, setCurrent] = useState<InferencePrefs | null>(null);
 
-	// Gate on the client only — prefs live in localStorage, so the decision is
-	// deferred to an effect to avoid a hydration mismatch on first paint.
+	// First-run gate — deferred to an effect so the localStorage read doesn't
+	// cause a hydration mismatch on first paint.
 	useEffect(() => {
-		if (loadInferencePrefs() === null) setOpen(true);
+		if (loadInferencePrefs() === null) setGateOpen(true);
 	}, []);
+
+	const manageOpen = manage?.open ?? false;
+	const open = gateOpen || manageOpen;
+	// The first-run gate is the only non-dismissible mode.
+	const required = gateOpen && !manageOpen;
+
+	// Each time it opens, reset to the top and refresh the shown current key.
+	useEffect(() => {
+		if (open) {
+			setCurrent(loadInferencePrefs());
+			setStep("choose");
+			setApiKey("");
+		}
+	}, [open]);
+
+	const close = () => {
+		setGateOpen(false);
+		manage?.onOpenChange(false);
+	};
 
 	const saveKey = async () => {
 		const trimmed = apiKey.trim();
@@ -86,7 +116,7 @@ export function SetupWizard() {
 			});
 			setApiKey("");
 			toast.success("Key attached — your agent now bills to your own account.");
-			setOpen(false);
+			close();
 		} catch {
 			toast.error("Couldn't reach the server — check your connection and retry.");
 		} finally {
@@ -94,12 +124,32 @@ export function SetupWizard() {
 		}
 	};
 
+	const removeKey = async () => {
+		const target = current?.provider ?? "anthropic";
+		try {
+			await fetch("/api/inference/byok", {
+				method: "DELETE",
+				headers: { "content-type": "application/json" },
+				body: JSON.stringify({ provider: target }),
+			});
+		} catch {
+			// Best-effort on the server; still clear locally so the UI is honest.
+		}
+		clearInferencePrefs();
+		setCurrent(null);
+		toast.success("Key removed. Add one to bill inference to your own account.");
+	};
+
 	return (
-		// Required gate: ignore backdrop/esc close attempts and hide the corner
-		// X — the only way out is choosing how the agent is powered. It closes
-		// only via the explicit setOpen(false) on a successful save.
-		<Dialog open={open} onOpenChange={(next) => next && setOpen(true)}>
-			<DialogContent hideClose className="max-w-md gap-5">
+		<Dialog
+			open={open}
+			// Ignore backdrop/esc while the gate is required; otherwise dismiss.
+			onOpenChange={(next) => {
+				if (next || required) return;
+				close();
+			}}
+		>
+			<DialogContent hideClose={required} className="max-w-md gap-5">
 				{step === "choose" ? (
 					<div
 						key="choose"
@@ -109,14 +159,43 @@ export function SetupWizard() {
 							<DialogTitle>Power the agent</DialogTitle>
 							<DialogDescription>
 								The agent runs on Claude. Choose who pays for its
-								inference — you can change this later.
+								inference — you can change this anytime.
 							</DialogDescription>
 						</DialogHeader>
+
+						{current?.mode === "byok" && current.keyHint ? (
+							<div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-xs">
+								<span className="flex min-w-0 items-center gap-2 text-muted-foreground">
+									<KeyRoundIcon className="size-3.5 shrink-0 text-primary" />
+									<span className="truncate">
+										{
+											PROVIDER_LABELS[
+												current.provider ?? "anthropic"
+											]
+										}
+										<span className="ml-1.5 font-mono text-foreground">
+											{current.keyHint}
+										</span>
+									</span>
+								</span>
+								<button
+									type="button"
+									onClick={() => void removeKey()}
+									className="shrink-0 rounded text-destructive-ink underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+								>
+									Remove
+								</button>
+							</div>
+						) : null}
 
 						<div className="space-y-2">
 							<OptionRow
 								icon={KeyRoundIcon}
-								title="Use your own API key"
+								title={
+									current?.mode === "byok"
+										? "Replace your API key"
+										: "Use your own API key"
+								}
 								description="Bill inference to your own provider account. Nothing runs through us."
 								onClick={() => setStep("key")}
 							/>

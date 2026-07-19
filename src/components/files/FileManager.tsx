@@ -1,13 +1,17 @@
 "use client";
 
-import { FileSpreadsheetIcon, MoreHorizontalIcon, PlusIcon } from "lucide-react";
+import {
+	FileSpreadsheetIcon,
+	MoreHorizontalIcon,
+	PlusIcon,
+	Trash2Icon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState } from "react";
 
 import { SheetsMark } from "@/components/brand/sheets-mark";
 import { Button } from "@/components/ui/button";
-import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import {
 	Dialog,
 	DialogContent,
@@ -36,6 +40,7 @@ import {
 import { toast } from "@/components/ui/toaster";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { OpenFromGoogle } from "@/components/files/OpenFromGoogle";
+import { TrashDialog } from "@/components/files/TrashDialog";
 import { SetupWizard } from "@/components/inference/SetupWizard";
 import { ensureIronCalc, Model } from "@/components/workbook/ironcalc";
 import { bytesToBase64 } from "@/lib/bytes";
@@ -45,7 +50,8 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 	const router = useRouter();
 	const [creating, setCreating] = useState(false);
 	const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
-	const [deleting, setDeleting] = useState<WorkbookMeta | null>(null);
+	const [trashOpen, setTrashOpen] = useState(false);
+	const [inferenceOpen, setInferenceOpen] = useState(false);
 
 	const createWorkbook = async () => {
 		setCreating(true);
@@ -96,29 +102,43 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 		router.refresh();
 	};
 
-	const remove = async (): Promise<string | null> => {
-		if (!deleting) return null;
-		const response = await fetch(`/api/workbooks/${deleting.id}`, {
+	// Delete is a soft-delete (recoverable from Trash), so a single deliberate
+	// menu click is enough — no type-to-confirm gate for a reversible action.
+	const moveToTrash = async (workbook: WorkbookMeta) => {
+		const response = await fetch(`/api/workbooks/${workbook.id}`, {
 			method: "DELETE",
 		});
-		if (!response.ok) return "Failed to delete workbook";
-		setDeleting(null);
-		toast.success("Workbook deleted");
+		if (!response.ok) {
+			toast.error("Couldn't delete the workbook");
+			return;
+		}
+		toast.success(`Moved “${workbook.name}” to trash`);
 		router.refresh();
-		return null;
 	};
 
 	return (
 		<main className="mx-auto w-full max-w-4xl px-6 py-10">
-			<SetupWizard />
+			<SetupWizard
+				manage={{ open: inferenceOpen, onOpenChange: setInferenceOpen }}
+			/>
 			<PageHeader
 				icon={SheetsMark}
 				iconClassName="bg-primary/10 text-primary"
 				title="Ingram Sheets"
-				description="AI-native spreadsheets"
-				className="mb-4 border-b-0 px-0 sm:px-0"
+				description="A spreadsheet agents operate directly"
+				className="mb-6 border-b-0 px-0 sm:px-0"
 				actions={
 					<>
+						<Button
+							variant="ghost"
+							size="icon"
+							title="Trash"
+							aria-label="Trash"
+							className="size-9 text-muted-foreground"
+							onClick={() => setTrashOpen(true)}
+						>
+							<Trash2Icon className="size-4" />
+						</Button>
 						<OpenFromGoogle />
 						<Button
 							onClick={() => void createWorkbook()}
@@ -127,10 +147,47 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 							<PlusIcon className="size-4" />
 							{creating ? "Creating…" : "New workbook"}
 						</Button>
-						<UserMenu />
+						<UserMenu
+							onOpenInferenceSettings={() => setInferenceOpen(true)}
+						/>
 					</>
 				}
 			/>
+
+			{/*
+			 * What this is. The product's whole argument is the inversion —
+			 * the spreadsheet is a tool the agent uses, not a chat bolted onto
+			 * a grid — so the home surface states it plainly rather than
+			 * selling it.
+			 */}
+			<section className="mb-8 max-w-xl space-y-3">
+				<h2 className="text-lg font-semibold tracking-tight text-balance">
+					A spreadsheet for agents to use — not one with AI bolted on.
+				</h2>
+				<p className="text-sm leading-relaxed text-muted-foreground text-pretty">
+					Claude in Excel and Gemini in Google Sheets put the model{" "}
+					<span className="font-medium text-foreground">inside</span> the
+					sheet, reaching in through an MCP. We turn that around: the
+					spreadsheet is a primitive the agent operates{" "}
+					<span className="font-medium text-foreground">directly</span>, and
+					this page is just a live window onto what it does. The engine runs
+					in your browser and the agent&apos;s edits land in the cells
+					you&apos;re editing — so you watch it work instead of reading a
+					transcript.
+				</p>
+				<p className="text-xs text-muted-foreground">
+					An experiment from{" "}
+					<a
+						href="https://ingram.tech"
+						target="_blank"
+						rel="noreferrer"
+						className="text-foreground underline-offset-4 hover:underline"
+					>
+						Ingram
+					</a>
+					.
+				</p>
+			</section>
 
 			{workbooks.length === 0 ? (
 				<EmptyState
@@ -214,7 +271,9 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 											</DropdownMenuItem>
 											<DropdownMenuItem
 												variant="destructive"
-												onClick={() => setDeleting(workbook)}
+												onClick={() =>
+													void moveToTrash(workbook)
+												}
 											>
 												Delete
 											</DropdownMenuItem>
@@ -264,21 +323,11 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 				</DialogContent>
 			</Dialog>
 
-			{deleting ? (
-				<DeleteConfirmDialog
-					title="Delete workbook"
-					confirmText={deleting.name}
-					confirmLabel="Delete workbook"
-					description={
-						<>
-							This permanently deletes <strong>{deleting.name}</strong>{" "}
-							and everything in it. This can&apos;t be undone.
-						</>
-					}
-					onClose={() => setDeleting(null)}
-					onConfirm={remove}
-				/>
-			) : null}
+			<TrashDialog
+				open={trashOpen}
+				onOpenChange={setTrashOpen}
+				onChange={() => router.refresh()}
+			/>
 		</main>
 	);
 }
