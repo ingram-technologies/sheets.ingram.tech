@@ -9,9 +9,9 @@ const SHEETKIT_URL = "https://github.com/ingram-technologies/sheetkit";
 /**
  * The public front door. Everything here is server-rendered and needs no
  * session — the only interactive island is <LandingCta>, which either signs the
- * visitor in with Google or links them into /spreadsheets. The pitch leans
- * entirely on how the thing actually works (see docs/architecture.md); the
- * honesty section is deliberate, not modesty theatre.
+ * visitor in with Google or links them into /spreadsheets. Framing: this is a
+ * research project, not a product launch. The copy stays at the level of what a
+ * visitor can see and try; implementation detail belongs in the blog post.
  */
 export function Landing({ signedIn }: { signedIn: boolean }) {
 	return (
@@ -60,15 +60,14 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
 							Give the agent the spreadsheet, not a chat box beside it.
 						</h1>
 						<p className="mt-6 text-lg leading-relaxed text-muted-foreground text-pretty">
-							The engine is IronCalc: a real calc engine, formulas and
-							dynamic arrays and all, compiled to WebAssembly and{" "}
+							The engine is IronCalc, a full spreadsheet engine compiled
+							to WebAssembly and{" "}
 							<span className="font-medium text-foreground">
 								running in your browser
 							</span>
-							. The agent&apos;s tools run right there with it, on the
-							same document you&apos;re editing. Ask it to build
-							something. You watch the cursor move and the cells fill in,
-							live.
+							. The agent&apos;s tools run there too, against the same
+							document you&apos;re editing. Ask it to build something and
+							watch the cursor move and the cells fill in.
 						</p>
 						<div className="mt-8 flex flex-wrap items-center gap-3">
 							<LandingCta signedIn={signedIn} size="lg" />
@@ -80,8 +79,8 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
 							</a>
 						</div>
 						<p className="mt-6 text-sm text-muted-foreground">
-							Single-player, early, and honest about what&apos;s rough.
-							The engine half is{" "}
+							Early, single-player, and more experiment than product. The
+							parts we built around the engine are{" "}
 							<a
 								href={SHEETKIT_URL}
 								target="_blank"
@@ -108,10 +107,10 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
 						Watch the agent work
 					</h2>
 					<p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">
-						The real grid and the real engine, running in your browser right
-						now. A recorded script drives the same tools the live agent uses
-						— no account, no inference. When it finishes, the cells are
-						yours to poke.
+						The grid and engine below are the real thing, running in your
+						browser right now. A recorded script drives the same tools the
+						live agent uses — no account, no inference. When it finishes,
+						the sheet is yours to edit.
 					</p>
 				</div>
 				<DemoWorkbook />
@@ -124,12 +123,12 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
 				</h2>
 				<div className="mt-6 max-w-2xl space-y-4 text-[15px] leading-relaxed text-muted-foreground">
 					<p>
-						Most attempts bolt a chat panel onto a grid, or let the model
-						reach in from outside through an MCP. The sticking point
-						isn&apos;t the transport. It&apos;s what the model gets back. It
-						reads one range, writes another, and to see what the write did,
-						it reads again. On a sheet full of formulas, that round-trip is
-						most of the work.
+						Most attempts bolt a chat panel onto a grid, or wire the model
+						in from outside over MCP. The hard part isn&apos;t the
+						transport, it&apos;s what the model gets back: it reads one
+						range, writes another, and to see what the write did, it reads
+						again. On a sheet full of formulas, that round-trip is most of
+						the work.
 					</p>
 					<p className="text-foreground">
 						So the tools are built around what the agent gets back.
@@ -138,11 +137,11 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
 				<dl className="mt-10 grid max-w-3xl gap-x-8 gap-y-8 sm:grid-cols-3">
 					<Rebuild
 						term="A structure-aware read"
-						desc="Instead of a cell-by-cell dump, the agent gets a compact sketch: regions, headers, types, fills. Enough to see the shape of a sheet without reading every cell."
+						desc="Instead of a cell-by-cell dump, the agent gets a compact sketch — regions, headers, types, fills — enough to see the layout of a sheet without reading every cell."
 					/>
 					<Rebuild
 						term="A delta echo on every write"
-						desc="Every write comes back with what it changed on that sheet, recalculated formulas included. The agent reads the result off its own edit, so most of the time it doesn't go back to check."
+						desc="Every write comes back with what it changed on that sheet, recalculated formulas included, so the agent usually doesn't have to read back after an edit."
 					/>
 					<Rebuild
 						term="Range-level verbs"
@@ -160,110 +159,51 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
 				</h2>
 				<div className="mt-10 grid gap-10 md:grid-cols-3 md:gap-8">
 					<Beat title="The engine runs in your browser">
-						The spreadsheet engine is <Mono>IronCalc</Mono>, compiled to
-						WebAssembly and running client-side: formulas, dynamic arrays,
-						undo, styles, number formats. The server never parses a
-						spreadsheet; it stores the engine&apos;s own bytes and hands
-						them back.
+						<Mono>IronCalc</Mono> handles formulas, dynamic arrays, undo,
+						styles, and number formats, all client-side. The server never
+						parses a spreadsheet — it stores the engine&apos;s own bytes and
+						hands them back.
 					</Beat>
 					<Beat title="The agent’s tools run there too">
 						Chat streams from the Anthropic API, but the tool calls the
-						model makes execute in your browser, against the same model
-						you&apos;re editing. One document, two hands on it: yours and
-						the agent&apos;s.
+						model makes execute in your browser, against the same document
+						you&apos;re editing.
 					</Beat>
-					<Beat title="You watch, you don’t read a log">
+					<Beat title="You watch it happen">
 						The agent focuses a range, switches to the sheet it&apos;s
 						working on, writes, and the changed cells pulse. Your cursor is
-						blue, the agent&apos;s is violet, so there&apos;s never any
-						doubt who touched what.
+						blue, the agent&apos;s is violet, so you can always tell whose
+						cursor is whose.
 					</Beat>
 				</div>
 			</Section>
 
 			<Divider />
 
-			{/* ── Under the hood ───────────────────────────────────────────── */}
-			<Section id="internals">
-				<h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-					Under the hood
-				</h2>
-				<p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-muted-foreground">
-					For the skeptics. None of it is a mock — this is the shape of the
-					code.
-				</p>
-				<dl className="mt-10 max-w-3xl divide-y divide-border border-y border-border">
-					<Row k="@ironcalc/wasm">
-						Vendored and pinned to a specific upstream git rev. The
-						published npm release predates ~150 functions —{" "}
-						<Mono>FILTER</Mono>, <Mono>SORT</Mono>, <Mono>UNIQUE</Mono>,{" "}
-						<Mono>LAMBDA</Mono>, the whole dynamic-array engine — and people
-						reach for those on day one, so we build the rev ourselves.
-					</Row>
-					<Row k="bytea">
-						Workbooks are stored as IronCalc&apos;s own bitcode, opaque to
-						the server. The engine version <em>is</em> the format version:
-						no server-side spreadsheet code to keep in sync, and no schema
-						to migrate. The tradeoff we take: bumping the engine is a format
-						break, not an upgrade, so stored workbooks move across versions
-						through xlsx.
-					</Row>
-					<Row k="tools without execute">
-						Chat tools are declared to the model with no server-side
-						handler. The AI SDK forwards each call to the browser, which
-						runs it against the controller and returns the result — the same
-						seam a future MCP transport slots into.
-					</Row>
-					<Row k="delta echo">
-						IronCalc exposes no &ldquo;what changed&rdquo; API, so the
-						controller snapshots the sheet&apos;s computed values before and
-						after each write and diffs them, up to a cap before it falls
-						back to just the written range. Brute force, but a full recalc
-						runs anyway, and it&apos;s what lets the agent skip the re-read
-						most of the time.
-					</Row>
-					<Row k="presence protocol">
-						Selections and cursors never enter the engine&apos;s diff
-						stream, so presence — status, highlights, cell pulses — is our
-						own protocol. It is the part that makes the agent&apos;s hand
-						visible.
-					</Row>
-					<Row k="prompt cache">
-						The current workbook sketch rides the last user message rather
-						than the system prompt, so the cacheable prefix stays
-						byte-stable from one turn to the next.
-					</Row>
-				</dl>
-			</Section>
-
-			<Divider />
-
-			{/* ── Honesty ──────────────────────────────────────────────────── */}
+			{/* ── Limits ───────────────────────────────────────────────────── */}
 			<Section id="limits">
 				<h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
 					What it isn&rsquo;t, yet
 				</h2>
 				<p className="mt-4 max-w-2xl text-[15px] leading-relaxed text-muted-foreground">
 					It&apos;s an early proof of an idea, and we use it ourselves.
-					We&apos;d rather point at the rough edges than let you find them.
 				</p>
 				<ul className="mt-8 max-w-2xl space-y-4 text-[15px] leading-relaxed text-muted-foreground">
 					<Limit term="Single-player.">
 						No realtime collaboration yet — one client edits a workbook at a
-						time. The diff-queue plumbing is already in the client, carried
-						unused, waiting on the server half.
+						time.
 					</Limit>
 					<Limit term="One owner per workbook.">
 						No sharing, no roles, no view links. A workbook is reachable by
 						its owner or by nobody.
 					</Limit>
 					<Limit term="Imports are thin.">
-						xlsx export and a 1:1 Google Sheets bridge work today; CSV and
-						xlsx import arrive with the server engine.
+						xlsx export and Google Sheets import work today; CSV and xlsx
+						import don&apos;t yet.
 					</Limit>
 					<Limit term="Some engine features aren&rsquo;t wired up.">
-						Frozen panes, merged cells, and a borders UI exist in IronCalc
-						but aren&apos;t plumbed into the renderer and toolbar yet.
+						Frozen panes, merged cells, and borders exist in the engine but
+						aren&apos;t wired into the UI yet.
 					</Limit>
 				</ul>
 			</Section>
@@ -275,12 +215,13 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
 				<div className="flex flex-col gap-6 rounded-xl border border-border bg-card/40 p-8 sm:flex-row sm:items-center sm:justify-between">
 					<div className="max-w-xl">
 						<h2 className="text-xl font-semibold tracking-tight">
-							The engine half is open source
+							What we built is open source
 						</h2>
 						<p className="mt-2 text-[15px] leading-relaxed text-muted-foreground">
-							The server daemon, the agent&apos;s tool surface as an MCP
-							DSL, and the channel protocol live in <Mono>sheetkit</Mono>.
-							This app is the private product UI built on top of it.
+							The engine is IronCalc, an open-source project we build on
+							but didn&apos;t write. Our parts — the server daemon, the
+							agent&apos;s tool definitions, and the sync protocol — live
+							in <Mono>sheetkit</Mono>. This app is the UI on top.
 						</p>
 					</div>
 					<a
@@ -387,17 +328,6 @@ function Beat({ title, children }: { title: string; children: React.ReactNode })
 			<p className="mt-3 text-sm leading-relaxed text-muted-foreground">
 				{children}
 			</p>
-		</div>
-	);
-}
-
-function Row({ k, children }: { k: string; children: React.ReactNode }) {
-	return (
-		<div className="grid gap-2 py-5 sm:grid-cols-[10rem_1fr] sm:gap-6">
-			<dt className="pt-px font-mono text-[13px] text-primary">{k}</dt>
-			<dd className="text-sm leading-relaxed text-muted-foreground">
-				{children}
-			</dd>
 		</div>
 	);
 }

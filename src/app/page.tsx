@@ -6,7 +6,7 @@ import { getUser } from "@/lib/session";
 export const dynamic = "force-dynamic";
 
 const DESCRIPTION =
-	"An AI-native spreadsheet where the agent operates the sheet directly — the IronCalc engine runs in your browser and the agent's tools run alongside it, so you watch it work instead of reading a transcript.";
+	"A spreadsheet where the agent works in the grid itself. Its tools run in your browser, against the document you're editing, so you watch it work instead of reading a transcript.";
 
 export const metadata: Metadata = {
 	title: "A spreadsheet the agent operates directly",

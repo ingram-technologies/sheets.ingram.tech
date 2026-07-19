@@ -402,8 +402,8 @@ function DemoChat({
 			>
 				{messages.length === 0 ? (
 					<p className="mt-2 px-1 text-sm text-muted-foreground">
-						Watch a recorded session — the agent builds a model in the grid
-						to the left, live.
+						A recorded session — the agent builds a model in the grid to the
+						left.
 					</p>
 				) : null}
 
