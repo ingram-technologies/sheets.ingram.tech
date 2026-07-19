@@ -23,9 +23,11 @@ import {
 } from "react";
 import { Streamdown } from "streamdown";
 
+import { SetupWizard } from "@/components/inference/SetupWizard";
 import { Button } from "@/components/ui/button";
 import type { AgentToolName } from "@/lib/agent-tools";
 import { agentToolSchemas } from "@/lib/agent-tools";
+import { isInferenceConfigured } from "@/lib/inference-prefs";
 import { cn } from "@/lib/utils";
 
 import { AgentExecutor, buildWorkbookOverview } from "../workbook/agent-executor";
@@ -71,6 +73,7 @@ export function ChatPanel({
 		[controller, renameDocument],
 	);
 	const [input, setInput] = useState("");
+	const [setupOpen, setSetupOpen] = useState(false);
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	// Whether the view is pinned to the newest message. Only then does new
 	// content scroll — otherwise reading back through history during a stream
@@ -132,6 +135,12 @@ export function ChatPanel({
 
 	const send = (text: string) => {
 		if (!text.trim() || busy) return;
+		// Gate: if the user hasn't set up inference (they may have chosen "look
+		// around first"), pop the setup instead of sending — and keep their text.
+		if (!isInferenceConfigured()) {
+			setSetupOpen(true);
+			return;
+		}
 		pinned.current = true;
 		setInput("");
 		void sendMessage({ text: text.trim() });
@@ -323,6 +332,8 @@ export function ChatPanel({
 					)}
 				</div>
 			</form>
+
+			<SetupWizard open={setupOpen} onOpenChange={setSetupOpen} />
 		</div>
 	);
 }

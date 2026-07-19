@@ -102,3 +102,20 @@ export function clearInferencePrefs(): void {
 export function isInferenceConfigured(): boolean {
 	return loadInferencePrefs() !== null;
 }
+
+const DEFERRED_KEY = "ingram-sheets.inference.deferred.v1";
+
+/**
+ * The user picked "look around first". This suppresses the automatic first-run
+ * nudge on the home page — but NOT the gate that re-appears when they try to
+ * message the agent — until they actually configure inference.
+ */
+export function isInferenceDeferred(): boolean {
+	if (typeof window === "undefined") return false;
+	return window.localStorage.getItem(DEFERRED_KEY) === "1";
+}
+
+export function deferInference(): void {
+	if (typeof window === "undefined") return;
+	window.localStorage.setItem(DEFERRED_KEY, "1");
+}

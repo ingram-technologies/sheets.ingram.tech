@@ -7,7 +7,6 @@ import {
 	CreditCardIcon,
 	KeyRoundIcon,
 	Loader2Icon,
-	ShieldCheckIcon,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -23,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toaster";
 import {
 	clearInferencePrefs,
+	deferInference,
 	INFERENCE_PROVIDERS,
 	type InferencePrefs,
 	type InferenceProvider,
@@ -42,33 +42,24 @@ type Step = "choose" | "key";
  * chats bill to their own account; pay-as-you-go (a funded Ingram Cloud
  * balance) is the phase-2 option.
  *
- * Two ways in: as a **required first-run gate** (no props) it self-gates on
- * localStorage and can't be dismissed until a choice is made; as **settings**
- * (`manage`) it's an ordinary dismissible dialog that also shows the current
- * key and lets the user replace or remove it. The raw key is never stored here.
+ * Fully controlled — the host decides when to open it: as a first-run nudge, as
+ * settings (from the menu), or when the user tries to message the agent without
+ * having set anything up. It's always dismissible; dismissing while nothing is
+ * configured records "look around first" so the nudge doesn't nag, but the
+ * message-time gate still re-appears. The raw key is never stored here.
  */
 export function SetupWizard({
-	manage,
+	open,
+	onOpenChange,
 }: {
-	manage?: { open: boolean; onOpenChange: (open: boolean) => void };
-} = {}) {
-	const [gateOpen, setGateOpen] = useState(false);
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+}) {
 	const [step, setStep] = useState<Step>("choose");
 	const [provider, setProvider] = useState<InferenceProvider>("anthropic");
 	const [apiKey, setApiKey] = useState("");
 	const [saving, setSaving] = useState(false);
 	const [current, setCurrent] = useState<InferencePrefs | null>(null);
-
-	// First-run gate — deferred to an effect so the localStorage read doesn't
-	// cause a hydration mismatch on first paint.
-	useEffect(() => {
-		if (loadInferencePrefs() === null) setGateOpen(true);
-	}, []);
-
-	const manageOpen = manage?.open ?? false;
-	const open = gateOpen || manageOpen;
-	// The first-run gate is the only non-dismissible mode.
-	const required = gateOpen && !manageOpen;
 
 	// Each time it opens, reset to the top and refresh the shown current key.
 	useEffect(() => {
@@ -79,9 +70,11 @@ export function SetupWizard({
 		}
 	}, [open]);
 
-	const close = () => {
-		setGateOpen(false);
-		manage?.onOpenChange(false);
+	// Dismissing without a configured key means "look around first" — remember
+	// it so the automatic nudge stays quiet (the send-time gate still fires).
+	const dismiss = () => {
+		if (loadInferencePrefs() === null) deferInference();
+		onOpenChange(false);
 	};
 
 	const saveKey = async () => {
@@ -116,7 +109,7 @@ export function SetupWizard({
 			});
 			setApiKey("");
 			toast.success("Key attached — your agent now bills to your own account.");
-			close();
+			onOpenChange(false);
 		} catch {
 			toast.error("Couldn't reach the server — check your connection and retry.");
 		} finally {
@@ -143,13 +136,11 @@ export function SetupWizard({
 	return (
 		<Dialog
 			open={open}
-			// Ignore backdrop/esc while the gate is required; otherwise dismiss.
 			onOpenChange={(next) => {
-				if (next || required) return;
-				close();
+				if (!next) dismiss();
 			}}
 		>
-			<DialogContent hideClose={required} className="max-w-md gap-5">
+			<DialogContent className="max-w-md gap-5">
 				{step === "choose" ? (
 					<div
 						key="choose"
@@ -207,6 +198,16 @@ export function SetupWizard({
 								disabled
 							/>
 						</div>
+
+						{current === null ? (
+							<button
+								type="button"
+								onClick={dismiss}
+								className="w-full rounded-md py-1 text-center text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+							>
+								Let me look around first
+							</button>
+						) : null}
 					</div>
 				) : (
 					<form
@@ -266,15 +267,6 @@ export function SetupWizard({
 								/>
 							</label>
 						</div>
-
-						<p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
-							<ShieldCheckIcon className="mt-px size-3.5 shrink-0" />
-							<span>
-								Sent once to Ingram Cloud and attached to your agent —
-								it never rests in this browser. A wrong key shows up as
-								an error on your next message.
-							</span>
-						</p>
 
 						<div className="flex items-center justify-between">
 							<Button

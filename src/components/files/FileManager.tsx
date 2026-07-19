@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { SheetsMark } from "@/components/brand/sheets-mark";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,7 @@ import { TrashDialog } from "@/components/files/TrashDialog";
 import { SetupWizard } from "@/components/inference/SetupWizard";
 import { ensureIronCalc, Model } from "@/components/workbook/ironcalc";
 import { bytesToBase64 } from "@/lib/bytes";
+import { isInferenceConfigured, isInferenceDeferred } from "@/lib/inference-prefs";
 import type { WorkbookMeta } from "@/lib/workbooks";
 
 export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
@@ -52,6 +53,12 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 	const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
 	const [trashOpen, setTrashOpen] = useState(false);
 	const [inferenceOpen, setInferenceOpen] = useState(false);
+
+	// First-run nudge: open the setup once, unless it's already configured or the
+	// user chose to look around first. Deferred to an effect (localStorage read).
+	useEffect(() => {
+		if (!isInferenceConfigured() && !isInferenceDeferred()) setInferenceOpen(true);
+	}, []);
 
 	const createWorkbook = async () => {
 		setCreating(true);
@@ -118,9 +125,7 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 
 	return (
 		<main className="mx-auto w-full max-w-4xl px-6 py-10">
-			<SetupWizard
-				manage={{ open: inferenceOpen, onOpenChange: setInferenceOpen }}
-			/>
+			<SetupWizard open={inferenceOpen} onOpenChange={setInferenceOpen} />
 			<PageHeader
 				icon={SheetsMark}
 				iconClassName="bg-primary/10 text-primary"
