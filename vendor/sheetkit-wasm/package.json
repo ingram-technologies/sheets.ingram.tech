@@ -1,0 +1,17 @@
+{
+  "name": "sheetkit-wasm",
+  "type": "module",
+  "description": "wasm-bindgen bindings for sheetkit: the LLM spreadsheet tool surface in the browser",
+  "version": "0.1.0",
+  "license": "MIT OR Apache-2.0",
+  "files": [
+    "sheetkit_wasm_bg.wasm",
+    "sheetkit_wasm.js",
+    "sheetkit_wasm.d.ts"
+  ],
+  "main": "sheetkit_wasm.js",
+  "types": "sheetkit_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

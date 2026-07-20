@@ -29,6 +29,7 @@
 		"@ingram-tech/nk-auth": "^0.12.3",
 		"@ingram-tech/nk-db": "^1.4.1",
 		"@ironcalc/wasm": "file:vendor/ironcalc-wasm",
+		"sheetkit-wasm": "file:vendor/sheetkit-wasm",
 		"ai": "^7.0.31",
 		"better-auth": "^1.6.23",
 		"class-variance-authority": "^0.7.1",

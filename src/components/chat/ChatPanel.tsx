@@ -30,7 +30,8 @@ import { agentToolSchemas } from "@/lib/agent-tools";
 import { isInferenceConfigured } from "@/lib/inference-prefs";
 import { cn } from "@/lib/utils";
 
-import { AgentExecutor, buildWorkbookOverview } from "../workbook/agent-executor";
+import { AgentExecutor } from "../workbook/agent-executor";
+import { buildAgentOverview } from "../workbook/overview";
 import type { WorkbookController } from "../workbook/controller";
 
 const TOOL_LABELS: Record<AgentToolName, string> = {
@@ -87,11 +88,14 @@ export function ChatPanel({
 		() =>
 			new DefaultChatTransport({
 				api: "/api/chat",
-				prepareSendMessagesRequest: ({ id, messages, body }) => ({
+				prepareSendMessagesRequest: async ({ id, messages, body }) => ({
 					body: {
 						id,
 						messages,
-						overview: buildWorkbookOverview(controller).slice(0, 16000),
+						overview: (await buildAgentOverview(controller)).slice(
+							0,
+							16000,
+						),
 						...body,
 					},
 				}),
