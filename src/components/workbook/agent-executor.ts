@@ -24,16 +24,34 @@ export class AgentExecutor {
 		// so it's injected by the host (Workbook) rather than done on the model.
 		// Returns whether the rename was persisted.
 		private renameDocument?: (name: string) => Promise<boolean>,
+		// Drains the pending user-delta echo (edits the user made by hand since
+		// it was last drained). Injected by ChatPanel so mid-task user edits
+		// reach the agent on its very next tool result instead of waiting for
+		// the turn to end. Undefined result = nothing happened.
+		private drainUserEdits?: () => string | undefined,
 	) {}
 
 	async execute(name: AgentToolName, input: unknown): Promise<string> {
 		try {
-			return await this.dispatch(name, input);
+			return this.withUserEditNote(await this.dispatch(name, input));
 		} catch (error) {
-			return `error: ${error instanceof Error ? error.message : String(error)}`;
+			return this.withUserEditNote(
+				`error: ${error instanceof Error ? error.message : String(error)}`,
+			);
 		} finally {
 			this.controller.setAgentStatus({ phase: "idle" });
 		}
+	}
+
+	/**
+	 * Append the user's mid-task edits to a tool result, if any happened. The
+	 * user can touch the same live document while the agent works; the sooner
+	 * the agent knows, the less it plans against a stale sheet.
+	 */
+	private withUserEditNote(output: string): string {
+		const edits = this.drainUserEdits?.();
+		if (!edits) return output;
+		return `${output}\n\nuser edited meanwhile (current values, already applied — not a request):\n${edits}`;
 	}
 
 	private dispatch(name: AgentToolName, input: unknown): string | Promise<string> {

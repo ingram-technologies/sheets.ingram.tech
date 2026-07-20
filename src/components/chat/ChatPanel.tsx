@@ -94,16 +94,21 @@ export function ChatPanel({
 	controller: WorkbookController;
 	renameDocument?: (name: string) => Promise<boolean>;
 }) {
-	const executor = useMemo(
-		() => new AgentExecutor(controller, renameDocument),
-		[controller, renameDocument],
-	);
 	const [input, setInput] = useState("");
 	const [setupOpen, setSetupOpen] = useState(false);
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	// The user-delta echo: cells the user edits by hand accumulate here, show
-	// as passive chips in the transcript, and ride the next request as context.
+	// as passive chips in the transcript, and reach the agent at the earliest
+	// seam — appended to its next tool result mid-task (the executor drains
+	// them), or attached to the next user message between turns.
 	const editLog = useMemo(() => new UserEditLog(), []);
+	const executor = useMemo(
+		() =>
+			new AgentExecutor(controller, renameDocument, () =>
+				editLog.takePendingText(),
+			),
+		[controller, renameDocument, editLog],
+	);
 	const lastMessageIdRef = useRef<string | null>(null);
 	// Whether the view is pinned to the newest message. Only then does new
 	// content scroll — otherwise reading back through history during a stream
