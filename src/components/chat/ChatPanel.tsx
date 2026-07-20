@@ -10,10 +10,12 @@ import {
 	ArrowUpIcon,
 	CircleAlertIcon,
 	Loader2Icon,
+	PencilLineIcon,
 	SparklesIcon,
 	SquareIcon,
 } from "lucide-react";
 import {
+	Fragment,
 	useCallback,
 	useEffect,
 	useMemo,
@@ -33,6 +35,8 @@ import { cn } from "@/lib/utils";
 import { AgentExecutor } from "../workbook/agent-executor";
 import { buildAgentOverview } from "../workbook/overview";
 import type { WorkbookController } from "../workbook/controller";
+import type { UserEditBurst } from "./user-edits";
+import { burstChipText, UserEditLog } from "./user-edits";
 
 const TOOL_LABELS: Record<AgentToolName, string> = {
 	get_workbook_overview: "Scanning workbook",
@@ -62,6 +66,27 @@ function isAgentToolName(name: string): name is AgentToolName {
 	return name in agentToolSchemas;
 }
 
+/**
+ * A burst of the user's own edits, shown as a passive transcript line — the
+ * visual twin of the agent's tool rows, in the user's pencil rather than the
+ * agent's dot. Never a message: the agent receives these as context on the
+ * next turn and is told not to respond to them.
+ */
+function UserEditChip({
+	burst,
+	multiSheet,
+}: {
+	burst: UserEditBurst;
+	multiSheet: boolean;
+}) {
+	return (
+		<div className="flex items-center gap-1.5 px-1 text-xs text-muted-foreground">
+			<PencilLineIcon className="size-3 shrink-0" />
+			<span className="truncate">{burstChipText(burst, multiSheet)}</span>
+		</div>
+	);
+}
+
 export function ChatPanel({
 	controller,
 	renameDocument,
@@ -76,6 +101,10 @@ export function ChatPanel({
 	const [input, setInput] = useState("");
 	const [setupOpen, setSetupOpen] = useState(false);
 	const scrollRef = useRef<HTMLDivElement | null>(null);
+	// The user-delta echo: cells the user edits by hand accumulate here, show
+	// as passive chips in the transcript, and ride the next request as context.
+	const editLog = useMemo(() => new UserEditLog(), []);
+	const lastMessageIdRef = useRef<string | null>(null);
 	// Whether the view is pinned to the newest message. Only then does new
 	// content scroll — otherwise reading back through history during a stream
 	// is impossible, because every token yanks you to the bottom.
@@ -88,19 +117,31 @@ export function ChatPanel({
 		() =>
 			new DefaultChatTransport({
 				api: "/api/chat",
-				prepareSendMessagesRequest: async ({ id, messages, body }) => ({
-					body: {
-						id,
-						messages,
-						overview: (await buildAgentOverview(controller)).slice(
-							0,
-							16000,
-						),
-						...body,
-					},
-				}),
+				prepareSendMessagesRequest: async ({ id, messages, body }) => {
+					// Only a plain user turn consumes the pending user edits —
+					// tool-loop continuations must not clear them (the route
+					// ignores the attachments on those requests anyway).
+					const last = messages[messages.length - 1];
+					const isUserTurn =
+						last?.role === "user" &&
+						last.parts.some((part) => part.type === "text");
+					return {
+						body: {
+							id,
+							messages,
+							overview: (await buildAgentOverview(controller)).slice(
+								0,
+								16000,
+							),
+							...(isUserTurn
+								? { userEdits: editLog.takePendingText() }
+								: {}),
+							...body,
+						},
+					};
+				},
 			}),
-		[controller],
+		[controller, editLog],
 	);
 
 	const { messages, sendMessage, addToolOutput, status, error, stop, regenerate } =
@@ -115,6 +156,42 @@ export function ChatPanel({
 				addToolOutput({ tool: name, toolCallId: toolCall.toolCallId, output });
 			},
 		});
+
+	// Anchor for user-edit bursts: the newest message at the moment of the edit.
+	lastMessageIdRef.current = messages[messages.length - 1]?.id ?? null;
+
+	// Record the user's hand: every user-authored mutation lands in the edit
+	// log with its delta echo. Agent mutations are excluded — the transcript
+	// already shows those as tool calls.
+	useEffect(
+		() =>
+			controller.onMutation((changes, author) => {
+				if (author !== "user" || changes.length === 0) return;
+				const sheets = controller.sheets();
+				editLog.record(
+					changes,
+					(index) => sheets[index]?.name ?? `Sheet ${index + 1}`,
+					lastMessageIdRef.current,
+				);
+			}),
+		[controller, editLog],
+	);
+
+	const bursts = useSyncExternalStore(
+		editLog.subscribe,
+		editLog.getBursts,
+		editLog.getBursts,
+	);
+	const burstsByAnchor = useMemo(() => {
+		const map = new Map<string | null, UserEditBurst[]>();
+		for (const burst of bursts) {
+			const list = map.get(burst.afterMessageId) ?? [];
+			list.push(burst);
+			map.set(burst.afterMessageId, list);
+		}
+		return map;
+	}, [bursts]);
+	const multiSheet = controller.sheets().length > 1;
 
 	// Presence: reset agent status when the turn ends.
 	useEffect(() => {
@@ -133,7 +210,7 @@ export function ChatPanel({
 	useEffect(() => {
 		const el = scrollRef.current;
 		if (el && pinned.current) el.scrollTop = el.scrollHeight;
-	}, [messages]);
+	}, [messages, bursts]);
 
 	const busy = status === "streaming" || status === "submitted";
 
@@ -189,83 +266,102 @@ export function ChatPanel({
 					</div>
 				) : null}
 
+				{(burstsByAnchor.get(null) ?? []).map((burst) => (
+					<UserEditChip
+						key={burst.id}
+						burst={burst}
+						multiSheet={multiSheet}
+					/>
+				))}
+
 				{messages.map((message) => (
-					<div key={message.id} className="space-y-1.5">
-						{message.parts.map((part, index) => {
-							if (part.type === "text") {
-								if (!part.text) return null;
-								if (message.role === "user") {
+					<Fragment key={message.id}>
+						<div className="space-y-1.5">
+							{message.parts.map((part, index) => {
+								if (part.type === "text") {
+									if (!part.text) return null;
+									if (message.role === "user") {
+										return (
+											<div
+												key={`${message.id}-${index}`}
+												className="ml-6 rounded-lg border border-border bg-accent px-3 py-2 text-sm whitespace-pre-wrap"
+											>
+												{part.text}
+											</div>
+										);
+									}
 									return (
 										<div
 											key={`${message.id}-${index}`}
-											className="ml-6 rounded-lg border border-border bg-accent px-3 py-2 text-sm whitespace-pre-wrap"
+											// Streamdown, not whitespace-pre-wrap: the model
+											// writes markdown, and every **bold**, list and
+											// table used to render as literal syntax. It also
+											// copes with half-finished markdown mid-stream.
+											className="px-1 text-sm leading-relaxed [&_code]:rounded [&_code]:bg-accent [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_table]:block [&_table]:overflow-x-auto [&_table]:text-xs [&_ul]:list-disc [&_ul]:pl-5"
 										>
-											{part.text}
+											<Streamdown>{part.text}</Streamdown>
 										</div>
 									);
 								}
-								return (
-									<div
-										key={`${message.id}-${index}`}
-										// Streamdown, not whitespace-pre-wrap: the model
-										// writes markdown, and every **bold**, list and
-										// table used to render as literal syntax. It also
-										// copes with half-finished markdown mid-stream.
-										className="px-1 text-sm leading-relaxed [&_code]:rounded [&_code]:bg-accent [&_code]:px-1 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-xs [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_table]:block [&_table]:overflow-x-auto [&_table]:text-xs [&_ul]:list-disc [&_ul]:pl-5"
-									>
-										<Streamdown>{part.text}</Streamdown>
-									</div>
-								);
-							}
-							if (isToolUIPart(part)) {
-								const name = part.type.replace(/^tool-/, "");
-								const label = isAgentToolName(name)
-									? TOOL_LABELS[name]
-									: name;
-								const running =
-									part.state === "input-streaming" ||
-									part.state === "input-available";
-								const output =
-									typeof part.output === "string" ? part.output : "";
-								const failed =
-									part.state === "output-available" &&
-									output.startsWith("error:");
-								return (
-									<div
-										key={part.toolCallId}
-										className="flex items-center gap-1.5 px-1 text-xs text-muted-foreground"
-									>
-										{running ? (
-											<Loader2Icon className="size-3 shrink-0 animate-spin text-agent" />
-										) : failed ? (
-											<CircleAlertIcon className="size-3 shrink-0 text-destructive-ink" />
-										) : (
-											<span className="size-1.5 shrink-0 rounded-full bg-agent" />
-										)}
-										<span
-											className={cn(
-												failed && "text-destructive-ink",
-											)}
+								if (isToolUIPart(part)) {
+									const name = part.type.replace(/^tool-/, "");
+									const label = isAgentToolName(name)
+										? TOOL_LABELS[name]
+										: name;
+									const running =
+										part.state === "input-streaming" ||
+										part.state === "input-available";
+									const output =
+										typeof part.output === "string"
+											? part.output
+											: "";
+									const failed =
+										part.state === "output-available" &&
+										output.startsWith("error:");
+									return (
+										<div
+											key={part.toolCallId}
+											className="flex items-center gap-1.5 px-1 text-xs text-muted-foreground"
 										>
-											{label}
-										</span>
-										<ToolTarget input={part.input} />
-										{/* The actual error was previously discarded —
-										    only a red icon survived. */}
-										{failed ? (
+											{running ? (
+												<Loader2Icon className="size-3 shrink-0 animate-spin text-agent" />
+											) : failed ? (
+												<CircleAlertIcon className="size-3 shrink-0 text-destructive-ink" />
+											) : (
+												<span className="size-1.5 shrink-0 rounded-full bg-agent" />
+											)}
 											<span
-												className="truncate text-destructive-ink"
-												title={output}
+												className={cn(
+													failed && "text-destructive-ink",
+												)}
 											>
-												{output.replace(/^error:\s*/, "")}
+												{label}
 											</span>
-										) : null}
-									</div>
-								);
-							}
-							return null;
-						})}
-					</div>
+											<ToolTarget input={part.input} />
+											{/* The actual error was previously discarded —
+										    only a red icon survived. */}
+											{failed ? (
+												<span
+													className="truncate text-destructive-ink"
+													title={output}
+												>
+													{output.replace(/^error:\s*/, "")}
+												</span>
+											) : null}
+										</div>
+									);
+								}
+								return null;
+							})}
+						</div>
+						{(burstsByAnchor.get(message.id) ?? []).map((burst) => (
+							<UserEditChip
+								key={burst.id}
+								burst={burst}
+								multiSheet={multiSheet}
+							/>
+						))}
+					</Fragment>
 				))}
 
 				{error ? (

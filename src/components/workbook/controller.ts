@@ -85,6 +85,9 @@ export class WorkbookController {
 	private version = 0;
 	private listeners = new Set<() => void>();
 	private dirtyListeners = new Set<() => void>();
+	private mutationListeners = new Set<
+		(changes: CellChange[], author: "user" | "agent") => void
+	>();
 	private geometry = new Map<number, SheetGeometry>();
 	private minExtent = new Map<number, { rows: number; cols: number }>();
 
@@ -110,6 +113,19 @@ export class WorkbookController {
 	onDirty(listener: () => void): () => void {
 		this.dirtyListeners.add(listener);
 		return () => this.dirtyListeners.delete(listener);
+	}
+
+	/**
+	 * Fires after every successful content mutation with its delta echo and the
+	 * acting principal (the pulse kind doubles as authorship: agent tools pass
+	 * "agent", everything else — keyboard, toolbar, undo — is the user). Feeds
+	 * the chat's user-edit log.
+	 */
+	onMutation(
+		listener: (changes: CellChange[], author: "user" | "agent") => void,
+	): () => void {
+		this.mutationListeners.add(listener);
+		return () => this.mutationListeners.delete(listener);
 	}
 
 	private notify() {
@@ -147,6 +163,8 @@ export class WorkbookController {
 		this.pulseChanges(changes, pulse);
 		this.notify();
 		for (const listener of this.dirtyListeners) listener();
+		const author = pulse === "agent" ? "agent" : "user";
+		for (const listener of this.mutationListeners) listener(changes, author);
 		return { ok: true, changes };
 	}
 

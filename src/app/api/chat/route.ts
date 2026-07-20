@@ -20,6 +20,7 @@ const SYSTEM_PROMPT = `You are the spreadsheet agent of sheets.ingram.tech, work
 
 How to work:
 - Each user message arrives with a fresh <current_workbook_state> sketch auto-attached (the user may edit cells between turns — trust the attached state over older history). Call get_workbook_overview only when you need to re-check state mid-task.
+- A <user_edits_since_last_turn> block may also be attached: cells the user changed by hand since your previous turn. The workbook state already reflects them. It is awareness, not a request — never revert or re-apply those edits, and don't comment on them unless they affect the task at hand.
 - Every mutation returns a recalc delta (every cell whose computed value changed, including formula ripple). Trust it — you never need to re-read a range after editing it.
 - Cell inputs are exactly what a user would type: formulas start with '=', numbers are bare, everything else is text. Use A1 references.
 - Prefer one set_cells block over many single-cell writes; prefer fill_range to extend a formula down a column.
@@ -32,6 +33,9 @@ const bodySchema = z.object({
 	messages: z.array(z.unknown()),
 	// Fresh workbook sketch computed by the browser engine at send time.
 	overview: z.string().max(20000).optional(),
+	// Cells the user changed by hand since the agent's last turn (the
+	// user-delta echo) — context for the agent, never an instruction.
+	userEdits: z.string().max(6000).optional(),
 });
 
 export async function POST(request: Request) {
@@ -64,7 +68,7 @@ export async function POST(request: Request) {
 		// so this stays the entire prompt (cloud.ingram.tech#163).
 		system: SYSTEM_PROMPT,
 		messages: await convertToModelMessages(
-			withWorkbookState(messages, parsed.data.overview),
+			withWorkbookState(messages, parsed.data.overview, parsed.data.userEdits),
 		),
 		// Single-sourced with the management-plane `external_id` so a BYOK key set
 		// on the smith and this run resolve to the SAME smith (cloud#170).
@@ -144,27 +148,35 @@ function messagesAsUi(messages: unknown[]): UIMessage[] {
 }
 
 /**
- * Attach the fresh workbook sketch to the latest plain user turn (per-request
- * only — it is never persisted into the client's message history, so each
- * request carries exactly one, current, sketch). Injecting here instead of
- * the system prompt keeps the cacheable prompt prefix byte-stable. Tool-loop
- * continuations (last user message is tool results) are left untouched — the
- * agent already tracks its own edits via delta echoes mid-task.
+ * Attach the fresh workbook sketch — and, when present, the user-delta echo —
+ * to the latest plain user turn (per-request only; neither is persisted into
+ * the client's message history, so each request carries exactly one, current,
+ * set). Injecting here instead of the system prompt keeps the cacheable
+ * prompt prefix byte-stable. Tool-loop continuations (last user message is
+ * tool results) are left untouched — the agent already tracks its own edits
+ * via delta echoes mid-task.
  */
-function withWorkbookState(messages: UIMessage[], overview?: string): UIMessage[] {
-	if (!overview) return messages;
+function withWorkbookState(
+	messages: UIMessage[],
+	overview?: string,
+	userEdits?: string,
+): UIMessage[] {
+	const blocks: string[] = [];
+	if (userEdits) {
+		blocks.push(
+			`<user_edits_since_last_turn>\n${userEdits}\n</user_edits_since_last_turn>`,
+		);
+	}
+	if (overview) {
+		blocks.push(`<current_workbook_state>\n${overview}\n</current_workbook_state>`);
+	}
+	if (blocks.length === 0) return messages;
 	const last = messages[messages.length - 1];
 	if (!last || last.role !== "user") return messages;
 	if (!last.parts.some((part) => part.type === "text")) return messages;
 	const annotated: UIMessage = {
 		...last,
-		parts: [
-			...last.parts,
-			{
-				type: "text",
-				text: `\n\n<current_workbook_state>\n${overview}\n</current_workbook_state>`,
-			},
-		],
+		parts: [...last.parts, { type: "text", text: `\n\n${blocks.join("\n\n")}` }],
 	};
 	return [...messages.slice(0, -1), annotated];
 }
