@@ -312,6 +312,15 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 					>
 						Ingram Technologies
 					</a>
+					{" · "}
+					<a
+						href="https://cloud.ingram.tech"
+						target="_blank"
+						rel="noreferrer"
+						className="underline-offset-4 transition-colors hover:text-foreground hover:underline"
+					>
+						Hosted in EU – Runs on Ingram Cloud
+					</a>
 				</p>
 				<a
 					href="https://ingram.tech/privacy"

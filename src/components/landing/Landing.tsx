@@ -258,6 +258,15 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
 						>
 							Ingram Technologies
 						</a>
+						{" · "}
+						<a
+							href="https://cloud.ingram.tech"
+							target="_blank"
+							rel="noreferrer"
+							className="underline-offset-4 transition-colors hover:text-foreground hover:underline"
+						>
+							Hosted in EU – Runs on Ingram Cloud
+						</a>
 					</p>
 					<div className="flex items-center gap-5">
 						<a
