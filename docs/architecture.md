@@ -42,11 +42,73 @@ IronCalc's bitcode format) in a Postgres `bytea` column. Creating a workbook
 happens client-side too: the browser builds an empty model and uploads its
 bytes. Consequences:
 
-- the server has no spreadsheet logic and no wasm dependency;
+- the *interactive* engine is the browser's; the server holds no session, no
+  undo stack, and no view state;
 - the bytes format is version-locked to the pinned engine — bumping it is a
   protocol break, not an upgrade (see `engine-constraints.md`);
 - when sheetd arrives it speaks the same format, and the blob store moves behind
   it.
+
+This document used to say the server has *no spreadsheet logic and no wasm
+dependency*. That is no longer true, and the exception is deliberate and
+bounded — see the next section.
+
+## The server-side engine (and why it exists)
+
+`src/lib/sheetkit-server.ts` runs **sheetkit-wasm in the Node runtime**: the
+sketch, the budgeted views, the command language, the delta echo — the same
+tool surface the browser uses for `get_workbook_overview`, over the same bytes.
+
+It exists for one reason: an MCP client should be able to work in a stored
+workbook *without a browser tab open*. Everything else about the product
+follows from workbooks being hosted rather than local files, and that only pays
+off if they are reachable when nobody is looking at them.
+
+The bound on the exception, precisely:
+
+- the server never holds a live model between requests — every call loads bytes,
+  acts, persists, and frees;
+- it owns no view state, no undo stack, no presence;
+- the browser remains the interactive source of truth, and the only thing the
+  two share is the opaque blob.
+
+sheetkit-wasm is built against the **same pinned IronCalc rev** as
+`@ironcalc/wasm`, so bytes written by either side load in the other with no
+translation. Bumping one without the other is a protocol break, not an upgrade.
+
+The wasm binary is located from the working directory against an ordered
+candidate list rather than with `require.resolve` — under Turbopack the latter
+returns a virtual `[project]/…` path that no filesystem call can open — and
+`next.config.ts` traces `vendor/sheetkit-wasm` into the MCP route's bundle.
+
+## Two writers, one blob
+
+`workbook.bytes` is replaced whole on every save, and a workbook now has two
+writers: the browser's autosave and the MCP endpoint. An unconditional write
+therefore *silently discards* whatever the other did since it read.
+
+So every write is a compare-and-swap on `workbook.version`:
+
+- the version travels as an **ETag** on `GET /api/workbooks/:id/bytes`, and a
+  PUT must carry it in `If-Match`. No `If-Match` is a `428`, not a blind write —
+  a client that cannot participate should fail loudly rather than quietly
+  overwrite;
+- a losing write gets `412` plus the current meta, so it can re-read rather than
+  guess;
+- the browser stops retrying on `412` and asks. Both sides of a conflict are
+  real work and nothing here can merge them, so "Load theirs / Keep mine" is the
+  user's call, never a silent default.
+
+`sheet_exec` is additionally **atomic**, which sheetkit's own REPL deliberately
+is not. A script that fails partway leaves the session half-applied, and in a
+REPL that is right — you can see the partial state and fix it. Here the workbook
+may be open in front of someone, so a failed script writes nothing at all; the
+agent still gets the full echo naming the failing line and what the discarded
+attempt would have done.
+
+sheetd makes all of this moot by serializing commands server-side. Until then
+this is the guard, and it is why `saveWorkbookBytes` has no unconditional
+variant.
 
 ## WorkbookController — the one door to the model
 
@@ -77,7 +139,62 @@ authoritative: keyboard nav uses
 `onArrow*`/`onExpandSelectedRange`/`onNavigateToEdgeInDirection`, and the
 renderer reads `getSelectedView()` each frame.
 
-## The agent loop
+## The MCP endpoint — the agent in your terminal
+
+`POST /api/mcp` (`src/app/api/mcp/route.ts`) lets an external MCP client —
+Claude Code — work in these workbooks:
+
+```sh
+claude mcp add --transport http sheets https://sheets.ingram.tech/api/mcp
+```
+
+Under `/api` because that is what it is: the app's public API, consumed by an
+external client. (Contrast `/internal`, for callers the public never is.)
+
+**Transport.** Stateless streamable-HTTP: one JSON-RPC request per POST, one
+JSON response, no server-held session. What would normally be protocol state —
+which workbook is open — rides in each call's `workbook_id`, so concurrent
+clients and retries need no coordination. Hand-rolled (`src/lib/mcp/`) rather
+than taken from the SDK: the stateless case is a few dozen lines, and the SDK's
+HTTP transport wants Node `req`/`res` objects a route handler does not have.
+Server-initiated messages (sampling, progress) would flip that trade.
+
+**Tools.** `sheet_list` / `sheet_open` / `sheet_view` / `sheet_exec` /
+`sheet_create` (`src/lib/mcp/tools.ts`). Shaped after sheetkit's own MCP server,
+with the difference that drives the rest: these workbooks are hosted and shared
+with a live tab, not local files, so there is no open/save/close lifecycle —
+every call loads current bytes, acts, persists. An agent cannot leave a workbook
+dirty or hold a stale session. The verbs stay inside `sheet_exec`'s command
+language, which is what keeps the surface small enough to hold in view.
+
+**Auth is OAuth**, via Better Auth's `mcp` plugin (`src/lib/auth.ts`), not an
+API-key table. An MCP client is a third-party program acting for the user, which
+is the case OAuth exists for: revocation is per-client, and there is no
+permanent key to leak. Claude Code registers itself dynamically, so nothing is
+configured per client. Discovery documents are re-exposed at the **origin root**
+(`src/app/.well-known/…`) because that is where clients look — our Better Auth
+mounts at `/auth`, not the root. The protected-resource route is an optional
+catch-all so both RFC 9728 path forms resolve.
+
+The user id comes from the OAuth grant and never from the request body, so the
+type-level ownership model in `src/lib/workbooks.ts` applies unchanged: someone
+else's workbook is *missing*, not forbidden.
+
+**Edits are visible.** A tab open on the workbook polls
+(`REMOTE_POLL_MS`, `Workbook.tsx`), adopts the server's copy, flashes the cells
+the echo named in the agent's violet, and shows the script and full echo above
+the grid (`src/lib/activity.ts`, `workbook.last_activity`). The pulses are
+explicitly best-effort — parsed from the echo's `REF ⇒ value` form, which elides
+long change lists — so the authoritative account stays the text. Polling is
+skipped while the tab is hidden *or the document is dirty*: adopting the
+server's copy discards unsaved local edits, so the poller never takes anything
+from someone mid-edit; their next save hits the CAS instead.
+
+`last_activity` is deliberately latest-only rather than an append-only journal —
+one read, no join, no unbounded growth. sheetd's exec journal is the real
+version and will replace it.
+
+## The agent loop (in-app chat)
 
 - `/api/chat` (`src/app/api/chat/route.ts`): AI SDK `streamText` against
   **Ingram Cloud** (`@ingram-cloud/ai-sdk`; tenant token + `IC-Agent-Id`, model
@@ -190,8 +307,11 @@ non-sensitive `drive.file` instead. Richer style transfer is a follow-up.
   Sign-in also (optionally, via Google's granular consent) requests the
   `spreadsheets` scope and stores a refresh token in the `account` table — the
   Google Sheets bridge runs on it.
-- **sheetd + realtime channel** — single-client editing only; the engine diff
-  queue (`flushSendQueue`/`applyExternalDiffs`) is carried unused until then.
+- **sheetd + realtime channel** — no live channel; a tab learns about outside
+  edits by polling, and the engine diff queue
+  (`flushSendQueue`/`applyExternalDiffs`) is carried unused until then. Two
+  writers are now real (browser + MCP) but they are serialized by a
+  compare-and-swap on `workbook.version`, not by an ordered command log.
 
   The end state it slots into: one authoritative `UserModel` per workbook in
   sheetd. Every principal (human or agent) submits *commands*; the server

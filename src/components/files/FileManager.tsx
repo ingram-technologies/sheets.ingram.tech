@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/table";
 import { toast } from "@/components/ui/toaster";
 import { UserMenu } from "@/components/auth/UserMenu";
+import { ConnectClaudeCode } from "@/components/files/ConnectClaudeCode";
 import { ImportCsv } from "@/components/files/ImportCsv";
 import { OpenFromGoogle } from "@/components/files/OpenFromGoogle";
 import { TrashDialog } from "@/components/files/TrashDialog";
@@ -145,6 +146,7 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 						>
 							<Trash2Icon className="size-4" />
 						</Button>
+						<ConnectClaudeCode />
 						<ImportCsv />
 						<OpenFromGoogle />
 						<Button

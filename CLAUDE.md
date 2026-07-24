@@ -11,9 +11,17 @@ the delta echo, the engine pin, or presence.
 
 ## The short version
 
-- The spreadsheet engine is **IronCalc wasm running in the browser**. The server
-  never parses spreadsheet content — it stores opaque engine bytes in Postgres
-  (`workbook.bytes`).
+- The *interactive* spreadsheet engine is **IronCalc wasm running in the
+  browser**; the server stores opaque engine bytes in Postgres
+  (`workbook.bytes`) and holds no session, view state, or undo stack.
+- **The server does have an engine, for one job.**
+  `src/lib/sheetkit-server.ts` runs sheetkit-wasm in Node so an MCP client can
+  work in a stored workbook with no tab open. It loads bytes, acts, persists,
+  frees — never holding a live model between requests. This reverses an older
+  rule; `docs/architecture.md` states the bound.
+- **Every `bytes` write is a compare-and-swap** on `workbook.version` (ETag +
+  `If-Match`), because the browser and the MCP endpoint both write the same
+  whole blob. There is deliberately no unconditional save.
 - `WorkbookController` (`src/components/workbook/controller.ts`) is the single
   owner of the model: every read/write from React, keyboard, and agent tools
   goes through it.
@@ -21,6 +29,9 @@ the delta echo, the engine pin, or presence.
   tools execute **client-side** against the same controller — that's what
   makes its activity visible live in the grid (presence overlays, pulses,
   highlights).
+- **Claude Code connects over MCP** at `POST /api/mcp` (`src/lib/mcp/`),
+  authenticated by OAuth (Better Auth's `mcp` plugin), executing server-side
+  against sheetkit-wasm. An open tab polls and shows those edits as they land.
 - Google sign-in via Better Auth / `@ingram-tech/nk-auth` (`src/lib/auth.ts`,
   mounted at `/auth`). **Workbooks are per-owner**: `workbook.user_id` is NOT
   NULL and every function in `src/lib/workbooks.ts` takes the owner and folds
