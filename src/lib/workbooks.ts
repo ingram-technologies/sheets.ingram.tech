@@ -1,6 +1,7 @@
 import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { type WorkbookActivity, workbookActivitySchema } from "./activity";
 import { db, schema } from "./db";
 import { ids } from "./ids";
 
@@ -10,6 +11,8 @@ export const workbookMetaSchema = z.object({
 	size: z.number(),
 	// Bumped on every bytes write; the token for compare-and-swap saves.
 	version: z.number(),
+	// What an MCP client last did here; null if nothing has.
+	lastActivity: workbookActivitySchema.nullable(),
 	googleSpreadsheetId: z.string().nullable(),
 	createdAt: z.iso.datetime(),
 	updatedAt: z.iso.datetime(),
@@ -24,6 +27,7 @@ const metaColumns = {
 	name: schema.workbooks.name,
 	size: sql<number>`octet_length(${schema.workbooks.bytes})`.mapWith(Number),
 	version: schema.workbooks.version,
+	lastActivity: schema.workbooks.lastActivity,
 	googleSpreadsheetId: schema.workbooks.googleSpreadsheetId,
 	createdAt: schema.workbooks.createdAt,
 	updatedAt: schema.workbooks.updatedAt,
@@ -41,6 +45,7 @@ function toMeta(row: {
 	name: string;
 	size: number;
 	version: number;
+	lastActivity: WorkbookActivity | null;
 	googleSpreadsheetId: string | null;
 	createdAt: Date;
 	updatedAt: Date;
@@ -51,6 +56,7 @@ function toMeta(row: {
 		name: row.name,
 		size: row.size,
 		version: row.version,
+		lastActivity: row.lastActivity,
 		googleSpreadsheetId: row.googleSpreadsheetId,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
@@ -192,6 +198,9 @@ export async function saveWorkbookBytes(
 	userId: string,
 	bytes: Uint8Array,
 	expectedVersion: number,
+	/** Set by MCP writes so an open tab can show what the agent did. Omitted
+	 *  by the browser's own autosave, which has nothing to announce. */
+	activity?: Omit<WorkbookActivity, "version">,
 ): Promise<SaveResult> {
 	const uuid = ids.workbook.decodeOrNull(id);
 	if (!uuid) return { ok: false, reason: "not_found" };
@@ -201,6 +210,11 @@ export async function saveWorkbookBytes(
 			bytes,
 			updatedAt: new Date(),
 			version: sql`${schema.workbooks.version} + 1`,
+			// The CAS guarantees the row was at expectedVersion, so the version
+			// this write produces is exactly one past it.
+			...(activity
+				? { lastActivity: { ...activity, version: expectedVersion + 1 } }
+				: {}),
 		})
 		.where(and(owned(uuid, userId), eq(schema.workbooks.version, expectedVersion)))
 		.returning(metaColumns);

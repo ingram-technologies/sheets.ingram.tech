@@ -3,11 +3,13 @@ import {
 	customType,
 	index,
 	integer,
+	jsonb,
 	pgTable,
 	text,
 	timestamp,
 } from "drizzle-orm/pg-core";
 
+import type { WorkbookActivity } from "./activity";
 import { idColumn } from "./ids";
 
 /**
@@ -49,6 +51,10 @@ export const workbooks = pgTable(
 		// re-reads instead of clobbering. sheetd will make this moot by
 		// serializing commands server-side; until then this is the guard.
 		version: integer("version").notNull().default(1),
+		// What an MCP client last did here, so an open tab can show the edit
+		// instead of just silently changing. Latest-only by design — see
+		// lib/activity.ts.
+		lastActivity: jsonb("last_activity").$type<WorkbookActivity>(),
 		// 1:1 link to a Google Sheets spreadsheet ("Save to Google Sheets"
 		// re-saves to it; import sets it). External id we don't mint → text.
 		googleSpreadsheetId: text("google_spreadsheet_id"),
