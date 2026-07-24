@@ -20,9 +20,33 @@ import { SheetTabs } from "./SheetTabs";
 import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
 
-type SaveState = "saved" | "dirty" | "saving" | "retrying" | "failed";
+type SaveState = "saved" | "dirty" | "saving" | "retrying" | "failed" | "conflict";
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
+
+/** `"3"` -> 3. Null when the header is missing or not a version ETag. */
+function parseEtag(header: string | null): number | null {
+	if (!header) return null;
+	const match = /^"(\d+)"$/.exec(header.trim());
+	if (!match?.[1]) return null;
+	return Number(match[1]);
+}
+
+/**
+ * Pull `version` out of a workbook-meta JSON body. Narrowed by hand rather
+ * than with the zod schema in lib/workbooks: that module imports the database
+ * client, and pulling it into a client component would drag drizzle and pg
+ * into the browser bundle.
+ */
+function readVersion(body: unknown, key: "version" | "meta"): number | null {
+	if (!body || typeof body !== "object") return null;
+	if (key === "meta") {
+		return "meta" in body ? readVersion(body.meta, "version") : null;
+	}
+	if (!("version" in body)) return null;
+	return typeof body.version === "number" ? body.version : null;
+}
+
 // Autosave retry backoff. Bounded: after the last attempt the UI stops
 // claiming anything is in flight and hands the user an explicit Retry.
 const RETRY_DELAYS_MS = [2000, 5000, 15000];
@@ -47,6 +71,17 @@ export function Workbook({
 	const attempt = useRef(0);
 	const saveStateRef = useRef<SaveState>("saved");
 	saveStateRef.current = saveState;
+	/**
+	 * The workbook version these bytes came from, carried as an ETag. Every
+	 * save is a compare-and-swap against it, because the MCP endpoint can
+	 * write this same workbook while the tab is open. Held in a ref, not
+	 * state: the save callback must read the newest value without being
+	 * re-created (and re-scheduling autosave) each time it changes.
+	 */
+	const version = useRef<number | null>(null);
+	/** Server's version at the moment a save was rejected — what "Keep mine"
+	 *  must write on top of to win the next round. */
+	const serverVersion = useRef<number | null>(null);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -60,6 +95,7 @@ export function Workbook({
 					throw new Error(`failed to load workbook (${response.status})`);
 				const bytes = new Uint8Array(await response.arrayBuffer());
 				if (cancelled) return;
+				version.current = parseEtag(response.headers.get("etag"));
 				const model = Model.from_bytes(bytes, "en");
 				setController(new WorkbookController(model));
 			} catch (error) {
@@ -100,12 +136,30 @@ export function Workbook({
 			setSaveState("saving");
 			try {
 				const bytes = controller.serialize();
+				const known = version.current;
 				const response = await fetch(`/api/workbooks/${id}/bytes`, {
 					method: "PUT",
-					headers: { "content-type": "application/octet-stream" },
+					headers: {
+						"content-type": "application/octet-stream",
+						// Conditional write: the server rejects this if the
+						// workbook moved on (an MCP client wrote) since load.
+						...(known === null ? {} : { "if-match": `"${known}"` }),
+					},
 					body: new Blob([bytes.buffer as ArrayBuffer]),
 				});
+				if (response.status === 412) {
+					// Someone else — Claude Code over MCP — saved first.
+					// Retrying cannot help and would overwrite them, so stop
+					// and let the user choose. Their in-memory edits are
+					// untouched; `serverVersion` is what "Keep mine" needs to
+					// write on top of.
+					const body: unknown = await response.json().catch(() => null);
+					serverVersion.current = readVersion(body, "meta");
+					setSaveState("conflict");
+					return;
+				}
 				if (!response.ok) throw new Error(String(response.status));
+				version.current = readVersion(await response.json(), "version");
 				attempt.current = 0;
 				setSaveState("saved");
 			} catch {
@@ -122,6 +176,55 @@ export function Workbook({
 		},
 		[controller, id],
 	);
+
+	/**
+	 * Replace the in-memory workbook with the server's copy.
+	 *
+	 * Used when an MCP client has written this workbook — either detected by
+	 * the poller, or discovered the hard way when a save was rejected. The
+	 * user's cursor is carried across: without that, every agent edit would
+	 * yank the view somewhere else mid-typing, since the engine serializes its
+	 * own selection into the bytes.
+	 *
+	 * Local unsaved edits are lost by design, so this is only ever called when
+	 * the document is clean or the user explicitly chose it.
+	 */
+	const adoptServerState = useCallback(async (): Promise<boolean> => {
+		try {
+			const response = await fetch(`/api/workbooks/${id}/bytes`);
+			if (!response.ok) throw new Error(String(response.status));
+			const bytes = new Uint8Array(await response.arrayBuffer());
+			const nextVersion = parseEtag(response.headers.get("etag"));
+			const model = Model.from_bytes(bytes, "en");
+			const next = new WorkbookController(model);
+			setController((previous) => {
+				if (previous) {
+					const view = previous.selectedView();
+					next.view((m) => {
+						m.setSelectedSheet(view.sheet);
+						m.setSelectedCell(view.row, view.column);
+					});
+				}
+				return next;
+			});
+			version.current = nextVersion;
+			attempt.current = 0;
+			setSaveState("saved");
+			return true;
+		} catch {
+			toast.error("Couldn't load the latest version");
+			return false;
+		}
+	}, [id]);
+
+	/**
+	 * Conflict resolution, user's choice: overwrite whatever the agent wrote
+	 * by rebasing onto the server's current version and saving again.
+	 */
+	const keepLocalChanges = useCallback(() => {
+		if (serverVersion.current !== null) version.current = serverVersion.current;
+		void save();
+	}, [save]);
 
 	// Rename the whole document — shared by the header field and the agent's
 	// rename_workbook tool. Optimistic with rollback; returns whether it stuck
@@ -223,7 +326,12 @@ export function Workbook({
 					initialGoogleSpreadsheetId={googleSpreadsheetId}
 				/>
 
-				<SaveIndicator state={saveState} onRetry={() => void save()} />
+				<SaveIndicator
+					state={saveState}
+					onRetry={() => void save()}
+					onDiscardLocal={() => void adoptServerState()}
+					onKeepLocal={keepLocalChanges}
+				/>
 
 				<Button
 					variant="ghost"
@@ -297,7 +405,17 @@ export function Workbook({
  * Save state. Every label here must be literally true — this is the one place
  * where a comforting lie costs the user their work.
  */
-function SaveIndicator({ state, onRetry }: { state: SaveState; onRetry: () => void }) {
+function SaveIndicator({
+	state,
+	onRetry,
+	onDiscardLocal,
+	onKeepLocal,
+}: {
+	state: SaveState;
+	onRetry: () => void;
+	onDiscardLocal: () => void;
+	onKeepLocal: () => void;
+}) {
 	return (
 		<div
 			className="ml-auto flex items-center gap-2 text-[11px] text-muted-foreground"
@@ -322,6 +440,30 @@ function SaveIndicator({ state, onRetry }: { state: SaveState; onRetry: () => vo
 						onClick={onRetry}
 					>
 						Retry
+					</Button>
+				</>
+			)}
+			{/* Both sides of a conflict are real work, and nothing here can
+			    merge them — so the choice is the user's, stated plainly,
+			    with no default that quietly discards one of them. */}
+			{state === "conflict" && (
+				<>
+					<span className="text-warning">Changed elsewhere</span>
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-6 px-2 text-[11px]"
+						onClick={onDiscardLocal}
+					>
+						Load theirs
+					</Button>
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-6 px-2 text-[11px]"
+						onClick={onKeepLocal}
+					>
+						Keep mine
 					</Button>
 				</>
 			)}

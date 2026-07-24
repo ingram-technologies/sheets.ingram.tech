@@ -43,6 +43,13 @@
 			"when": 1784482014626,
 			"tag": "0005_workbook_soft_delete",
 			"breakpoints": true
+		},
+		{
+			"idx": 6,
+			"version": "7",
+			"when": 1784908132945,
+			"tag": "0006_workbook_version",
+			"breakpoints": true
 		}
 	]
 }

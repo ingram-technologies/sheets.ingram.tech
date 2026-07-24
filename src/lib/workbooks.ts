@@ -8,6 +8,8 @@ export const workbookMetaSchema = z.object({
 	id: z.string(),
 	name: z.string(),
 	size: z.number(),
+	// Bumped on every bytes write; the token for compare-and-swap saves.
+	version: z.number(),
 	googleSpreadsheetId: z.string().nullable(),
 	createdAt: z.iso.datetime(),
 	updatedAt: z.iso.datetime(),
@@ -21,6 +23,7 @@ const metaColumns = {
 	id: schema.workbooks.id,
 	name: schema.workbooks.name,
 	size: sql<number>`octet_length(${schema.workbooks.bytes})`.mapWith(Number),
+	version: schema.workbooks.version,
 	googleSpreadsheetId: schema.workbooks.googleSpreadsheetId,
 	createdAt: schema.workbooks.createdAt,
 	updatedAt: schema.workbooks.updatedAt,
@@ -37,6 +40,7 @@ function toMeta(row: {
 	id: string;
 	name: string;
 	size: number;
+	version: number;
 	googleSpreadsheetId: string | null;
 	createdAt: Date;
 	updatedAt: Date;
@@ -46,6 +50,7 @@ function toMeta(row: {
 		id: ids.workbook.encode(row.id),
 		name: row.name,
 		size: row.size,
+		version: row.version,
 		googleSpreadsheetId: row.googleSpreadsheetId,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
@@ -116,19 +121,6 @@ export async function getWorkbookMeta(
 	return row ? toMeta(row) : null;
 }
 
-export async function getWorkbookBytes(
-	id: string,
-	userId: string,
-): Promise<Uint8Array | null> {
-	const uuid = ids.workbook.decodeOrNull(id);
-	if (!uuid) return null;
-	const rows = await db
-		.select({ bytes: schema.workbooks.bytes })
-		.from(schema.workbooks)
-		.where(owned(uuid, userId));
-	return rows[0]?.bytes ?? null;
-}
-
 export async function createWorkbook(input: {
 	userId: string;
 	name: string;
@@ -157,20 +149,71 @@ export async function linkGoogleSpreadsheet(
 	return rows.length > 0;
 }
 
+/**
+ * Bytes plus the version that produced them — the read half of a
+ * compare-and-swap. Callers that intend to write back must use this rather
+ * than {@link getWorkbookBytes}, so the version they hold provably matches the
+ * bytes they edited.
+ */
+export async function getWorkbookForEdit(
+	id: string,
+	userId: string,
+): Promise<{ bytes: Uint8Array; meta: WorkbookMeta } | null> {
+	const uuid = ids.workbook.decodeOrNull(id);
+	if (!uuid) return null;
+	const rows = await db
+		.select({ ...metaColumns, bytes: schema.workbooks.bytes })
+		.from(schema.workbooks)
+		.where(owned(uuid, userId));
+	const row = rows[0];
+	if (!row) return null;
+	const { bytes, ...meta } = row;
+	return { bytes, meta: toMeta(meta) };
+}
+
+export type SaveResult =
+	| { ok: true; meta: WorkbookMeta }
+	| { ok: false; reason: "not_found" }
+	/** Someone else wrote since `expectedVersion` was read; `meta` is current. */
+	| { ok: false; reason: "conflict"; meta: WorkbookMeta };
+
+/**
+ * Compare-and-swap the workbook blob.
+ *
+ * `expectedVersion` is the version the caller's bytes were derived from. If
+ * the row has moved on — the other writer saved first — nothing is written and
+ * the caller is told the current state so it can re-read and reapply. This is
+ * the only write path for `bytes`; there is deliberately no unconditional
+ * variant, because `bytes` is a whole-blob replace and a blind write is
+ * indistinguishable from silently deleting the other writer's work.
+ */
 export async function saveWorkbookBytes(
 	id: string,
 	userId: string,
 	bytes: Uint8Array,
-): Promise<WorkbookMeta | null> {
+	expectedVersion: number,
+): Promise<SaveResult> {
 	const uuid = ids.workbook.decodeOrNull(id);
-	if (!uuid) return null;
+	if (!uuid) return { ok: false, reason: "not_found" };
 	const rows = await db
 		.update(schema.workbooks)
-		.set({ bytes, updatedAt: new Date() })
-		.where(owned(uuid, userId))
+		.set({
+			bytes,
+			updatedAt: new Date(),
+			version: sql`${schema.workbooks.version} + 1`,
+		})
+		.where(and(owned(uuid, userId), eq(schema.workbooks.version, expectedVersion)))
 		.returning(metaColumns);
 	const row = rows[0];
-	return row ? toMeta(row) : null;
+	if (row) return { ok: true, meta: toMeta(row) };
+
+	// Zero rows means either the workbook is gone/not ours, or the version
+	// moved. Only a follow-up read can tell those apart, and the difference
+	// matters: one is a 404, the other is a retryable conflict.
+	const current = await getWorkbookMeta(id, userId);
+	return current
+		? { ok: false, reason: "conflict", meta: current }
+		: { ok: false, reason: "not_found" };
 }
 
 export async function renameWorkbook(

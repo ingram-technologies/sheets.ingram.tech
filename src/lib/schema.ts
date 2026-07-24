@@ -1,5 +1,12 @@
 import { sql } from "drizzle-orm";
-import { customType, index, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+	customType,
+	index,
+	integer,
+	pgTable,
+	text,
+	timestamp,
+} from "drizzle-orm/pg-core";
 
 import { idColumn } from "./ids";
 
@@ -32,6 +39,16 @@ export const workbooks = pgTable(
 		userId: text("user_id").notNull(),
 		name: text("name").notNull(),
 		bytes: bytea("bytes").notNull(),
+		// Optimistic-concurrency counter, bumped on every bytes write.
+		//
+		// A workbook now has two writers — the browser's autosave and the MCP
+		// endpoint (Claude Code, no tab open) — and `bytes` is a whole-blob
+		// replace, so an unconditional write silently discards whatever the
+		// other writer did since it read. Every save is therefore a
+		// compare-and-swap on this column: a stale writer is rejected and
+		// re-reads instead of clobbering. sheetd will make this moot by
+		// serializing commands server-side; until then this is the guard.
+		version: integer("version").notNull().default(1),
 		// 1:1 link to a Google Sheets spreadsheet ("Save to Google Sheets"
 		// re-saves to it; import sets it). External id we don't mint → text.
 		googleSpreadsheetId: text("google_spreadsheet_id"),
