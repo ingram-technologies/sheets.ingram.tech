@@ -4,6 +4,12 @@ import { ArrowLeftIcon, PanelRightCloseIcon, PanelRightOpenIcon } from "lucide-r
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import {
+	changedCellsFromOutput,
+	type WorkbookActivity,
+	workbookActivitySchema,
+} from "@/lib/activity";
+import { formatCell, parseCell } from "@/lib/a1";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { SheetsMark } from "@/components/brand/sheets-mark";
 import { ChatPanel } from "@/components/chat/ChatPanel";
@@ -30,6 +36,26 @@ function parseEtag(header: string | null): number | null {
 	const match = /^"(\d+)"$/.exec(header.trim());
 	if (!match?.[1]) return null;
 	return Number(match[1]);
+}
+
+/**
+ * How often an open tab checks whether something edited this workbook from
+ * outside. Fast enough that an agent's edit feels live, slow enough to be a
+ * rounding error on a single indexed row read.
+ */
+const REMOTE_POLL_MS = 2500;
+
+/** First line of a script, for a one-line "what the agent is doing" label. */
+function firstLine(script: string): string {
+	const line = script.split("\n").find((l) => l.trim().length > 0) ?? script;
+	return line.length > 80 ? `${line.slice(0, 79)}…` : line;
+}
+
+/** The activity record off a meta payload, or null if absent/malformed. */
+function readActivity(body: unknown): WorkbookActivity | null {
+	if (!body || typeof body !== "object" || !("lastActivity" in body)) return null;
+	const parsed = workbookActivitySchema.safeParse(body.lastActivity);
+	return parsed.success ? parsed.data : null;
 }
 
 /**
@@ -66,6 +92,8 @@ export function Workbook({
 	const [editing, setEditing] = useState<EditingState | null>(null);
 	const [name, setName] = useState(initialName);
 	const [chatOpen, setChatOpen] = useState(true);
+	/** The most recent edit made from outside this tab, shown until dismissed. */
+	const [remoteActivity, setRemoteActivity] = useState<WorkbookActivity | null>(null);
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const attempt = useRef(0);
@@ -189,33 +217,119 @@ export function Workbook({
 	 * Local unsaved edits are lost by design, so this is only ever called when
 	 * the document is clean or the user explicitly chose it.
 	 */
-	const adoptServerState = useCallback(async (): Promise<boolean> => {
-		try {
-			const response = await fetch(`/api/workbooks/${id}/bytes`);
-			if (!response.ok) throw new Error(String(response.status));
-			const bytes = new Uint8Array(await response.arrayBuffer());
-			const nextVersion = parseEtag(response.headers.get("etag"));
-			const model = Model.from_bytes(bytes, "en");
-			const next = new WorkbookController(model);
-			setController((previous) => {
-				if (previous) {
-					const view = previous.selectedView();
-					next.view((m) => {
-						m.setSelectedSheet(view.sheet);
-						m.setSelectedCell(view.row, view.column);
+	const adoptServerState = useCallback(
+		async (activity?: WorkbookActivity | null): Promise<boolean> => {
+			try {
+				const response = await fetch(`/api/workbooks/${id}/bytes`);
+				if (!response.ok) throw new Error(String(response.status));
+				const bytes = new Uint8Array(await response.arrayBuffer());
+				const nextVersion = parseEtag(response.headers.get("etag"));
+				const model = Model.from_bytes(bytes, "en");
+				const next = new WorkbookController(model);
+
+				// Where the agent was working. The engine serializes its own
+				// selection, so the incoming bytes carry the sheet the script
+				// last touched — which is how the pulses land on the right
+				// sheet without parsing sheet names out of the echo text.
+				const agentSheet = next.selectedView().sheet;
+
+				setController((previous) => {
+					if (previous) {
+						const view = previous.selectedView();
+						next.view((m) => {
+							m.setSelectedSheet(view.sheet);
+							m.setSelectedCell(view.row, view.column);
+						});
+					}
+					return next;
+				});
+
+				if (activity) {
+					// Flash the cells the echo named, in the agent's colour, so
+					// the change reads as something that *happened* rather than
+					// the grid quietly being different. Best-effort by
+					// construction (see changedCellsFromOutput) — the
+					// authoritative account is the echo shown alongside.
+					const changes = changedCellsFromOutput(activity.output)
+						.map((ref) => parseCell(ref))
+						.filter((ref) => ref !== null)
+						.map((ref) => ({
+							sheet: agentSheet,
+							cell: formatCell(ref),
+							old: "",
+							new: "",
+						}));
+					if (changes.length > 0) next.pulseChanges(changes, "agent");
+					next.setAgentStatus({
+						phase: "editing",
+						detail: firstLine(activity.script),
+						sheet: agentSheet,
 					});
+					setRemoteActivity(activity);
 				}
-				return next;
-			});
-			version.current = nextVersion;
-			attempt.current = 0;
-			setSaveState("saved");
-			return true;
-		} catch {
-			toast.error("Couldn't load the latest version");
-			return false;
+
+				version.current = nextVersion;
+				attempt.current = 0;
+				setSaveState("saved");
+				return true;
+			} catch {
+				toast.error("Couldn't load the latest version");
+				return false;
+			}
+		},
+		[id],
+	);
+
+	/**
+	 * Watch for edits made outside this tab — Claude Code working over MCP,
+	 * with or without anyone looking at the screen.
+	 *
+	 * Polling, because there is no realtime channel yet (sheetd will bring
+	 * one; see docs/architecture.md). Cheap: the meta endpoint is a single
+	 * indexed row read, and the poll is skipped entirely when the tab is
+	 * hidden or the document is dirty.
+	 *
+	 * Skipping while dirty is the important half. Adopting the server's copy
+	 * throws away un-saved local edits, so the poller only ever acts on a
+	 * clean document. If the user is mid-edit when the agent writes, nothing
+	 * is taken from them — their next save hits the compare-and-swap and they
+	 * get the explicit choice instead.
+	 */
+	useEffect(() => {
+		if (!controller) return;
+		let stopped = false;
+		let timer: ReturnType<typeof setTimeout> | null = null;
+
+		async function poll() {
+			if (
+				document.visibilityState === "visible" &&
+				saveStateRef.current === "saved" &&
+				version.current !== null
+			) {
+				try {
+					const response = await fetch(`/api/workbooks/${id}`);
+					if (response.ok) {
+						const meta: unknown = await response.json();
+						const latest = readVersion(meta, "version");
+						if (latest !== null && latest > version.current) {
+							await adoptServerState(readActivity(meta));
+						}
+					}
+				} catch {
+					// A failed poll is not worth telling the user about; the
+					// next tick tries again, and a genuinely broken connection
+					// surfaces through save state instead.
+				}
+			}
+			if (!stopped) timer = setTimeout(() => void poll(), REMOTE_POLL_MS);
 		}
-	}, [id]);
+
+		timer = setTimeout(() => void poll(), REMOTE_POLL_MS);
+		return () => {
+			stopped = true;
+			if (timer) clearTimeout(timer);
+		};
+	}, [controller, id, adoptServerState]);
 
 	/**
 	 * Conflict resolution, user's choice: overwrite whatever the agent wrote
@@ -355,6 +469,12 @@ export function Workbook({
 				<>
 					<Toolbar controller={controller} />
 					<FormulaBar controller={controller} />
+					{remoteActivity ? (
+						<RemoteActivityBar
+							activity={remoteActivity}
+							onDismiss={() => setRemoteActivity(null)}
+						/>
+					) : null}
 					<div className="relative flex min-h-0 flex-1">
 						<div className="flex min-w-0 flex-1 flex-col">
 							<div className="min-h-0 flex-1">
@@ -397,6 +517,53 @@ export function Workbook({
 					Loading workbook…
 				</div>
 			)}
+		</div>
+	);
+}
+
+/**
+ * What just changed in this workbook, when it wasn't you.
+ *
+ * The grid updating on its own is the demo, but on its own it is also
+ * unnerving — so this says who did it and shows the script and the recalc echo
+ * verbatim. The echo is the authoritative account of the edit (the cell
+ * pulses are best-effort decoration), which is why it is reproduced in full
+ * rather than summarised.
+ */
+function RemoteActivityBar({
+	activity,
+	onDismiss,
+}: {
+	activity: WorkbookActivity;
+	onDismiss: () => void;
+}) {
+	return (
+		<div
+			className="flex shrink-0 items-start gap-2 border-b border-border bg-agent-bg px-3 py-1.5 text-[11px]"
+			role="status"
+			aria-live="polite"
+		>
+			<span className="mt-px font-medium whitespace-nowrap text-agent">
+				{activity.author} edited
+			</span>
+			<details className="min-w-0 flex-1">
+				<summary className="cursor-pointer truncate text-muted-foreground marker:content-['']">
+					{firstLine(activity.script)}
+				</summary>
+				<pre className="mt-1.5 max-h-40 overflow-auto font-mono text-[10px] leading-relaxed whitespace-pre-wrap text-muted-foreground">
+					{activity.script}
+					{"\n\n"}
+					{activity.output}
+				</pre>
+			</details>
+			<Button
+				variant="ghost"
+				size="sm"
+				className="-my-0.5 h-5 shrink-0 px-1.5 text-[11px] text-muted-foreground"
+				onClick={onDismiss}
+			>
+				Dismiss
+			</Button>
 		</div>
 	);
 }
