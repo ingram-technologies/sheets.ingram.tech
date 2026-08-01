@@ -4,11 +4,20 @@
  */
 import { runMigrations } from "@ingram-tech/nk-db/migrate";
 
+import { authMigrationChain } from "../src/lib/auth-migrations";
 import { pool } from "../src/lib/db";
 
 async function main() {
-	const { applied } = await runMigrations({ pool, migrationsFolder: "./drizzle" });
+	// nk-auth's chain first: the app's tables FK to `user`.
+	const auth = await runMigrations({
+		pool,
+		migrationsFolder: authMigrationChain.folder,
+		migrationsTable: authMigrationChain.table,
+	});
+	const app = await runMigrations({ pool, migrationsFolder: "./drizzle" });
 	await pool.end();
+
+	const applied = [...auth.applied, ...app.applied];
 	console.log(
 		applied.length > 0
 			? `migrations applied: ${applied.join(", ")}`

@@ -32,7 +32,8 @@ const BOB = "22222222-2222-7222-8222-222222222222";
 
 beforeAll(async () => {
 	const { createTestDb } = await import("@ingram-tech/nk-db/pglite");
-	testDb = await createTestDb();
+	const { authMigrationChain } = await import("@/lib/auth-migrations");
+	testDb = await createTestDb({ dependencyMigrations: [authMigrationChain] });
 	// Hand the single available connection to the app's pool — see above.
 	await testDb.pool.end();
 	process.env.DATABASE_URL = testDb.databaseUrl;

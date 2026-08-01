@@ -4,10 +4,16 @@
  */
 import { startPgliteDev } from "@ingram-tech/nk-db/pglite";
 
+import { authMigrationChain } from "../src/lib/auth-migrations";
+
 const fresh = process.argv.includes("--fresh");
 const nextArgs = process.argv.slice(2).filter((arg) => arg !== "--fresh");
 
-startPgliteDev({ fresh, nextArgs }).catch((error) => {
+startPgliteDev({
+	fresh,
+	nextArgs,
+	dependencyMigrations: [authMigrationChain],
+}).catch((error) => {
 	console.error("pglite-dev: failed to start —", error);
 	process.exit(1);
 });
