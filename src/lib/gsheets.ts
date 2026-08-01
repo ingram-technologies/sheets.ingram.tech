@@ -211,6 +211,8 @@ async function replaceSpreadsheet(
 		.parse(meta)
 		.sheets.map((sheet) => sheet.properties.sheetId);
 	const firstFreeId = Math.max(-1, ...existing) + 1;
+	// Not an id: a throwaway suffix keeping temp sheet titles from colliding in one batchUpdate.
+	// oxlint-disable-next-line nextkit/no-crypto-random-uuid -- never stored, never leaves this call
 	const tempSuffix = randomUUID().slice(0, 8);
 
 	const requests: unknown[] = [

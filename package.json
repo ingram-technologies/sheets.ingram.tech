@@ -18,6 +18,7 @@
 		"test:watch": "vitest",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "tsx scripts/migrate.ts",
+		"db:migrate:status": "nk-pg-migrate --status",
 		"prepare": "git config core.hooksPath .githooks || true"
 	},
 	"dependencies": {
@@ -49,7 +50,7 @@
 	"devDependencies": {
 		"@electric-sql/pglite": "^0.5.4",
 		"@electric-sql/pglite-socket": "^0.2.7",
-		"@ingram-tech/nk-dev": "^0.6.0",
+		"@ingram-tech/nk-dev": "^0.9.0",
 		"@tailwindcss/postcss": "^4.3.3",
 		"@types/node": "^26.1.2",
 		"@types/pg": "^8.20.2",
