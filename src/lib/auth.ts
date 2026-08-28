@@ -3,6 +3,7 @@ import { betterAuth } from "better-auth";
 import { mcp } from "better-auth/plugins";
 
 import { pool } from "@/lib/db";
+import { isDevEmailPasswordSignInEnabled } from "@/lib/dev-auth";
 import { DRIVE_FILE_SCOPE, SPREADSHEETS_SCOPE } from "@/lib/gsheets-transfer";
 
 /**
@@ -24,6 +25,9 @@ export const auth = betterAuth({
 	baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
 	basePath: authBasePath,
 	advanced: { database: { generateId: uuidGenerateId } },
+	// This is intentionally enabled only for an explicit local-development
+	// opt-in. Better Auth also rejects its email/password endpoints when false.
+	emailAndPassword: { enabled: isDevEmailPasswordSignInEnabled },
 	socialProviders: {
 		google: {
 			clientId: process.env.GOOGLE_CLIENT_ID ?? "",

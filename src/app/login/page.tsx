@@ -1,6 +1,7 @@
 import { safeNext } from "@ingram-tech/nk-auth/server";
 
 import { redirectIfAuthenticated } from "@/lib/session";
+import { isDevEmailPasswordSignInEnabled } from "@/lib/dev-auth";
 
 import { LoginForm } from "./login-form";
 
@@ -13,5 +14,10 @@ export default async function LoginPage({
 }) {
 	const next = safeNext((await searchParams).next) ?? "/spreadsheets";
 	await redirectIfAuthenticated(next);
-	return <LoginForm next={next} />;
+	return (
+		<LoginForm
+			next={next}
+			enableDevEmailPassword={isDevEmailPasswordSignInEnabled}
+		/>
+	);
 }

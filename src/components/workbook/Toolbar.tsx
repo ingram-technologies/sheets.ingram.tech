@@ -10,6 +10,7 @@ import {
 	ChevronDownIcon,
 	ItalicIcon,
 	PaintBucketIcon,
+	PercentIcon,
 	Redo2Icon,
 	StrikethroughIcon,
 	TypeIcon,
@@ -32,7 +33,9 @@ import { cn } from "@/lib/utils";
 
 import type { WorkbookController } from "./controller";
 import type { Color } from "./ironcalc";
+import { isPercent, stepDecimals, togglePercent } from "./number-format";
 import { AUTOMATIC_COLOR, SWATCHES } from "./palette";
+import { ScrollStrip } from "./ScrollStrip";
 
 const NUMBER_FORMATS: { label: string; example: string; fmt: string }[] = [
 	{ label: "Automatic", example: "1000.12", fmt: "general" },
@@ -64,7 +67,9 @@ export function Toolbar({ controller }: { controller: WorkbookController }) {
 	const view = controller.selectedView();
 	const style = controller.cellStyle(view.sheet, view.row, view.column);
 	const model = controller.model;
-	const currentFormat = style.num_fmt;
+	// Normalised once: an unset format reads back as "" from an imported
+	// workbook, and every consumer below would otherwise repeat the check.
+	const currentFormat = style.num_fmt || "general";
 
 	// A cell colour can be a literal hex or a [themeIndex, tint] pair; only the
 	// engine can flatten the latter. Resolve before comparing against a swatch.
@@ -74,6 +79,12 @@ export function Toolbar({ controller }: { controller: WorkbookController }) {
 		color ? controller.resolveColor(color) : "";
 	const currentInk = resolve(style.font.color);
 	const currentTint = resolve(style.fill?.color);
+
+	// Null from stepDecimals means "this format has no decimals" — a date or a
+	// time — which is a disabled button, never a silently ignored click.
+	const percent = isPercent(currentFormat);
+	const fewerDecimals = stepDecimals(currentFormat, -1);
+	const moreDecimals = stepDecimals(currentFormat, 1);
 
 	const setStyle = (path: string, value: string) => {
 		const range = selectionRange(controller);
@@ -87,14 +98,15 @@ export function Toolbar({ controller }: { controller: WorkbookController }) {
 	};
 
 	return (
-		// overflow-x-auto: the row can't wrap without changing the chrome's
-		// height, so a narrow viewport scrolls it rather than clipping controls
-		// away with no affordance.
-		<div
+		// The row can't wrap without changing the chrome's height, so a narrow
+		// viewport scrolls it — inside a ScrollStrip, which is what tells the
+		// user the rest of the row exists and gives a mouse a way to reach it.
+		<ScrollStrip
 			role="toolbar"
 			aria-label="Formatting"
 			aria-orientation="horizontal"
-			className="flex h-10 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border bg-background px-2"
+			className="h-10 w-full shrink-0 border-b border-border bg-background px-2"
+			contentClassName="gap-0.5"
 		>
 			<IconButton
 				label="Undo (Ctrl+Z)"
@@ -183,6 +195,38 @@ export function Toolbar({ controller }: { controller: WorkbookController }) {
 
 			<Separator orientation="vertical" className="mx-1 h-5" />
 
+			{/*
+			 * The three number-format actions that carry the traffic. They were
+			 * reachable only two clicks deep in the menu beside them, which put
+			 * the most repeated formatting gesture in a spreadsheet behind the
+			 * slowest control in the toolbar.
+			 */}
+			<IconButton
+				label="Format as percent"
+				active={percent}
+				onClick={() => setStyle("num_fmt", togglePercent(currentFormat))}
+			>
+				<PercentIcon className="size-4" />
+			</IconButton>
+			<IconButton
+				wide
+				label="Decrease decimal places"
+				// A date or a time has no decimals to step, and rewriting one
+				// into a number format would relabel every cell in the range.
+				disabled={fewerDecimals === null}
+				onClick={() => fewerDecimals && setStyle("num_fmt", fewerDecimals)}
+			>
+				<span className="tabular-nums">&minus;.0</span>
+			</IconButton>
+			<IconButton
+				wide
+				label="Increase decimal places"
+				disabled={moreDecimals === null}
+				onClick={() => moreDecimals && setStyle("num_fmt", moreDecimals)}
+			>
+				<span className="tabular-nums">+.0</span>
+			</IconButton>
+
 			<DropdownMenu>
 				<DropdownMenuTrigger
 					render={
@@ -222,7 +266,7 @@ export function Toolbar({ controller }: { controller: WorkbookController }) {
 					})}
 				</DropdownMenuContent>
 			</DropdownMenu>
-		</div>
+		</ScrollStrip>
 	);
 }
 
@@ -230,12 +274,15 @@ function IconButton({
 	label,
 	active,
 	disabled,
+	wide,
 	onClick,
 	children,
 }: {
 	label: string;
 	active?: boolean;
 	disabled?: boolean;
+	/** For a short typographic label (−.0) rather than a 16px glyph. */
+	wide?: boolean;
 	onClick: () => void;
 	children: React.ReactNode;
 }) {
@@ -245,12 +292,13 @@ function IconButton({
 				render={
 					<Button
 						variant="ghost"
-						size="icon"
+						size={wide ? "sm" : "icon"}
 						disabled={disabled}
 						aria-label={label}
 						aria-pressed={active}
 						className={cn(
-							"size-7 shrink-0",
+							"shrink-0 text-xs",
+							wide ? "h-7 px-1.5" : "size-7",
 							active
 								? // Coral is the brand's "active/shipped state"
 									// signal. The old `bg-accent` was charcoal on

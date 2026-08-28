@@ -248,6 +248,37 @@
 
 @layer base {
 	/*
+	 * Reserve the scrollbar gutter on pages that opt in with
+	 * `data-stable-gutter`.
+	 *
+	 * Without it the viewport WIDTH depends on the page HEIGHT, which makes a
+	 * responsive breakpoint bistable. The workbook list is the case that
+	 * exposed it: below `sm` every row carries a second meta line and the
+	 * footer wraps, so the page is ~100px taller and needs a scrollbar; above
+	 * `sm` it doesn't. Each mode is then self-consistent over a narrow band of
+	 * widths — tall enough to need the scrollbar that keeps it narrow, or short
+	 * enough to drop the scrollbar that keeps it wide — so within that band the
+	 * layout holds whichever mode it happened to reach, and a one-pixel resize
+	 * flips it. Chrome compounds this by matching `min-width` against the
+	 * viewport INCLUDING the classic scrollbar while laying the content out in
+	 * what's left, so at the breakpoint the query and the layout disagree by
+	 * the scrollbar's width.
+	 *
+	 * A reserved gutter breaks the loop: height can no longer change width, so
+	 * the breakpoint is one step instead of a band.
+	 *
+	 * `overflow-y: auto` is load-bearing — `scrollbar-gutter` only applies to a
+	 * real scroll container, and on a root with the default `visible` it is
+	 * silently ignored. `:has()` keeps both off every other surface: the
+	 * workbook is `h-dvh` with its own inner scrollers and must not lose 15px
+	 * of grid to a gutter it never uses.
+	 */
+	html:has([data-stable-gutter]) {
+		overflow-y: auto;
+		scrollbar-gutter: stable;
+	}
+
+	/*
 	 * Default border colour. Tailwind v4 dropped v3's preflight that reset every
 	 * element's border to gray-200, so a bare `border` / `border-b` now paints in
 	 * `currentColor` — which on charcoal chrome is the near-white ink, producing
@@ -259,6 +290,23 @@
 	*::before,
 	*::after {
 		border-color: var(--color-border);
+	}
+
+	/*
+	 * Chrome strips that carry their own scroll affordance.
+	 *
+	 * Only for the toolbar and the sheet-tab strip (see ScrollStrip), where the
+	 * row is 36–40px tall and a classic scrollbar takes a third of it while
+	 * still reading as a rendering defect. Those strips replace it with an edge
+	 * fade plus a chevron, so the scroll stays both visible and operable — this
+	 * is never a licence to hide a scrollbar on a real scrolling surface.
+	 */
+	.scrollbar-none {
+		scrollbar-width: none;
+	}
+
+	.scrollbar-none::-webkit-scrollbar {
+		display: none;
 	}
 
 	/*

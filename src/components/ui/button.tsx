@@ -26,6 +26,11 @@ const buttonVariants = cva(
 				sm: "h-9 rounded-md px-3",
 				lg: "h-11 rounded-md px-8",
 				icon: "h-10 w-10",
+				// 28px: the density this app's chrome already hand-rolls as
+				// `className="size-7"` on toolbar toggles, sheet-tab menus and
+				// the header's icon buttons, and the size AI Elements asks for
+				// by name. Still clears the WCAG 2.2 24px target-size floor.
+				"icon-sm": "size-7",
 			},
 		},
 		defaultVariants: {

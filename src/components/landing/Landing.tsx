@@ -3,6 +3,7 @@ import { ArrowUpRightIcon } from "lucide-react";
 import { SheetsMark } from "@/components/brand/sheets-mark";
 import { DemoWorkbook } from "@/components/landing/DemoWorkbook";
 import { LandingCta } from "@/components/landing/LandingCta";
+import { isDevEmailPasswordSignInEnabled } from "@/lib/dev-auth";
 
 const SHEETKIT_URL = "https://github.com/ingram-technologies/sheetkit";
 
@@ -45,7 +46,11 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
 						sheetkit
 						<ArrowUpRightIcon className="size-3.5" />
 					</a>
-					<LandingCta signedIn={signedIn} size="sm">
+					<LandingCta
+						signedIn={signedIn}
+						enableDevEmailPassword={isDevEmailPasswordSignInEnabled}
+						size="sm"
+					>
 						{signedIn ? "Open" : "Sign in"}
 					</LandingCta>
 				</nav>
@@ -70,7 +75,11 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
 							watch the cursor move and the cells fill in.
 						</p>
 						<div className="mt-8 flex flex-wrap items-center gap-3">
-							<LandingCta signedIn={signedIn} size="lg" />
+							<LandingCta
+								signedIn={signedIn}
+								enableDevEmailPassword={isDevEmailPasswordSignInEnabled}
+								size="lg"
+							/>
 							<a
 								href="#how"
 								className="inline-flex h-11 items-center rounded-md px-5 text-sm font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
@@ -242,7 +251,11 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
 					<h2 className="max-w-2xl text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
 						Open a blank sheet and ask the agent to build something in it.
 					</h2>
-					<LandingCta signedIn={signedIn} size="lg" />
+					<LandingCta
+						signedIn={signedIn}
+						enableDevEmailPassword={isDevEmailPasswordSignInEnabled}
+						size="lg"
+					/>
 				</div>
 			</section>
 

@@ -25,8 +25,10 @@ export function LandingCta({
 	size = "default",
 	className,
 	children,
+	enableDevEmailPassword,
 }: {
 	signedIn: boolean;
+	enableDevEmailPassword: boolean;
 	size?: "default" | "sm" | "lg";
 	className?: string;
 	children?: React.ReactNode;
@@ -53,6 +55,19 @@ export function LandingCta({
 				render={<Link href={AFTER_AUTH} />}
 			>
 				{children ?? "Open your spreadsheets"}
+				<ArrowRightIcon className="size-4 transition-transform group-hover:translate-x-0.5" />
+			</Button>
+		);
+	}
+
+	if (enableDevEmailPassword) {
+		return (
+			<Button
+				size={size}
+				className={cn("group", className)}
+				render={<Link href={`/login?next=${AFTER_AUTH}`} />}
+			>
+				{children ?? "Sign in"}
 				<ArrowRightIcon className="size-4 transition-transform group-hover:translate-x-0.5" />
 			</Button>
 		);

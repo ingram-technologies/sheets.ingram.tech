@@ -1,10 +1,11 @@
 "use client";
 
 import { Loader2Icon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { SheetsMark } from "@/components/brand/sheets-mark";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
 
 // If the handoff to Google hasn't navigated away by now, something is wrong
@@ -12,9 +13,16 @@ import { authClient } from "@/lib/auth-client";
 // leaving "Redirecting…" disabled forever.
 const REDIRECT_TIMEOUT_MS = 8000;
 
-export function LoginForm({ next }: { next: string }) {
+export function LoginForm({
+	next,
+	enableDevEmailPassword,
+}: {
+	next: string;
+	enableDevEmailPassword: boolean;
+}) {
 	const [pending, setPending] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [isCreatingDevAccount, setIsCreatingDevAccount] = useState(false);
 	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
@@ -53,6 +61,27 @@ export function LoginForm({ next }: { next: string }) {
 		}
 	};
 
+	const signInWithEmailPassword = async (event: FormEvent<HTMLFormElement>) => {
+		event.preventDefault();
+		const form = new FormData(event.currentTarget);
+		const email = String(form.get("email") ?? "");
+		const password = String(form.get("password") ?? "");
+		const name = String(form.get("name") ?? "");
+
+		setPending(true);
+		setError(null);
+		try {
+			const result = isCreatingDevAccount
+				? await authClient.signUp.email({ name, email, password })
+				: await authClient.signIn.email({ email, password });
+			if (result.error) throw new Error(result.error.message ?? "Sign-in failed");
+			window.location.assign(next);
+		} catch (caught) {
+			setPending(false);
+			setError(caught instanceof Error ? caught.message : "Sign-in failed");
+		}
+	};
+
 	return (
 		<main className="flex min-h-dvh items-center justify-center px-6">
 			<div className="w-full max-w-sm space-y-8">
@@ -80,6 +109,74 @@ export function LoginForm({ next }: { next: string }) {
 						)}
 						{pending ? "Redirecting…" : "Continue with Google"}
 					</Button>
+					{enableDevEmailPassword ? (
+						<>
+							<div className="flex items-center gap-3 text-xs text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
+								Local development
+							</div>
+							<form
+								className="space-y-3"
+								onSubmit={signInWithEmailPassword}
+							>
+								{isCreatingDevAccount ? (
+									<Input
+										name="name"
+										placeholder="Name"
+										required
+										disabled={pending}
+									/>
+								) : null}
+								<Input
+									name="email"
+									type="email"
+									placeholder="Email"
+									autoComplete="email"
+									required
+									disabled={pending}
+								/>
+								<Input
+									name="password"
+									type="password"
+									placeholder="Password"
+									autoComplete={
+										isCreatingDevAccount
+											? "new-password"
+											: "current-password"
+									}
+									minLength={8}
+									required
+									disabled={pending}
+								/>
+								<Button
+									type="submit"
+									variant="secondary"
+									className="w-full"
+									disabled={pending}
+									aria-busy={pending}
+								>
+									{pending ? (
+										<Loader2Icon className="size-4 animate-spin" />
+									) : null}
+									{isCreatingDevAccount
+										? "Create local account"
+										: "Sign in locally"}
+								</Button>
+							</form>
+							<Button
+								variant="link"
+								className="w-full text-xs"
+								disabled={pending}
+								onClick={() => {
+									setIsCreatingDevAccount((current) => !current);
+									setError(null);
+								}}
+							>
+								{isCreatingDevAccount
+									? "Already have a local account? Sign in"
+									: "Need a local account? Create one"}
+							</Button>
+						</>
+					) : null}
 					{error ? (
 						<p
 							className="text-center text-sm text-destructive-ink"

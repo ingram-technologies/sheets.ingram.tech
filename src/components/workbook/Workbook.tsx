@@ -1,6 +1,11 @@
 "use client";
 
-import { ArrowLeftIcon, PanelRightCloseIcon, PanelRightOpenIcon } from "lucide-react";
+import {
+	ArrowLeftIcon,
+	KeyboardIcon,
+	PanelRightCloseIcon,
+	PanelRightOpenIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -14,21 +19,33 @@ import { UserMenu } from "@/components/auth/UserMenu";
 import { SheetsMark } from "@/components/brand/sheets-mark";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/toaster";
 
 import { WorkbookController } from "./controller";
 import { ensureIronCalc, Model } from "./ironcalc";
+import { AgentPanelResizer, useAgentPanelWidth } from "./AgentPanelResizer";
 import { FileMenu } from "./FileMenu";
+import { FindBar } from "./FindBar";
 import { FormulaBar } from "./FormulaBar";
 import type { EditingState } from "./Grid";
 import { Grid } from "./Grid";
+import { useModKeyLabel } from "./mod-key";
 import { SheetTabs } from "./SheetTabs";
+import { ShortcutsDialog } from "./ShortcutsDialog";
 import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
 
 type SaveState = "saved" | "dirty" | "saving" | "retrying" | "failed" | "conflict";
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
+
+/**
+ * Where "back" goes. `/` is the public landing page — a signed-in user who
+ * followed the old back arrow landed on the marketing pitch for the product
+ * they already had open, with their workbooks nowhere in sight.
+ */
+const WORKBOOK_LIST = "/spreadsheets";
 
 /** `"3"` -> 3. Null when the header is missing or not a version ETag. */
 function parseEtag(header: string | null): number | null {
@@ -92,6 +109,24 @@ export function Workbook({
 	const [editing, setEditing] = useState<EditingState | null>(null);
 	const [name, setName] = useState(initialName);
 	const [chatOpen, setChatOpen] = useState(true);
+	const [panelWidth, setPanelWidth] = useAgentPanelWidth();
+
+	/**
+	 * On a phone the panel overlays the grid rather than sitting beside it, so
+	 * opening the workbook with it up meant landing on a sheet you could not
+	 * see — 320px of panel over a 390px viewport left about one column. Start
+	 * from the same value the server rendered, then close it once on mount if
+	 * the viewport is actually narrow.
+	 */
+	useEffect(() => {
+		if (window.matchMedia("(max-width: 767px)").matches) setChatOpen(false);
+	}, []);
+	/** Null = closed. "replace" opens the find panel with replace expanded. */
+	const [find, setFind] = useState<"find" | "replace" | null>(null);
+	const [shortcutsOpen, setShortcutsOpen] = useState(false);
+	/** Lifted so the File menu's "Rename…" can open the header's title field. */
+	const [renamingTitle, setRenamingTitle] = useState(false);
+	const modKey = useModKeyLabel();
 	/** The most recent edit made from outside this tab, shown until dismissed. */
 	const [remoteActivity, setRemoteActivity] = useState<WorkbookActivity | null>(null);
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -382,6 +417,50 @@ export function Workbook({
 		};
 	}, [controller, save]);
 
+	/**
+	 * App-level keys, bound to the window rather than the grid because they
+	 * must work from the formula bar and the agent panel too.
+	 *
+	 * Each of these otherwise reaches the *browser* and does the wrong thing:
+	 * Ctrl+S offers to save the page as HTML, and Ctrl+F opens a find bar that
+	 * searches the DOM — which, for a canvas grid, is an empty document. In a
+	 * spreadsheet both read as the app being broken.
+	 */
+	useEffect(() => {
+		const onKeyDown = (event: KeyboardEvent) => {
+			const mod = event.ctrlKey || event.metaKey;
+			const key = event.key.toLowerCase();
+			if (mod && key === "s") {
+				event.preventDefault();
+				if (saveStateRef.current !== "saved") void save();
+				return;
+			}
+			if (mod && (key === "f" || key === "h")) {
+				event.preventDefault();
+				setFind(key === "h" ? "replace" : "find");
+				return;
+			}
+			// Closing Find lives here so it works wherever focus went — the
+			// panel, the grid, or a cell you navigated to from a hit. The cell
+			// editor stops Escape before it reaches the window, so cancelling
+			// an edit does not also dismiss the search.
+			if (event.key === "Escape") {
+				setFind(null);
+				return;
+			}
+			// Ctrl+/ (Google Sheets' own binding), not a bare "?". The grid
+			// turns every printable key into the start of a cell edit, so "?"
+			// would open this list AND leave a "?" being typed into the cell
+			// behind it. A modifier keeps the two apart.
+			if (mod && key === "/") {
+				event.preventDefault();
+				setShortcutsOpen(true);
+			}
+		};
+		window.addEventListener("keydown", onKeyDown);
+		return () => window.removeEventListener("keydown", onKeyDown);
+	}, [save]);
+
 	// Flush on tab hide; warn before closing with unsaved changes.
 	useEffect(() => {
 		const onVisibility = () => {
@@ -412,7 +491,10 @@ export function Workbook({
 					<p className="text-sm text-destructive-ink" role="alert">
 						{loadError}
 					</p>
-					<Link href="/" className="text-sm text-muted-foreground underline">
+					<Link
+						href={WORKBOOK_LIST}
+						className="text-sm text-muted-foreground underline"
+					>
 						Back to workbooks
 					</Link>
 				</div>
@@ -423,21 +505,34 @@ export function Workbook({
 	return (
 		<div className="flex h-dvh flex-col bg-background text-foreground">
 			<header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
-				<Link
-					href="/"
-					aria-label="All workbooks"
-					className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-				>
-					<ArrowLeftIcon className="size-4" />
-				</Link>
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<Link
+								href={WORKBOOK_LIST}
+								aria-label="All workbooks"
+								className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+							>
+								<ArrowLeftIcon className="size-4" />
+							</Link>
+						}
+					/>
+					<TooltipContent>All workbooks</TooltipContent>
+				</Tooltip>
 				{/* The brand mark, not a generic grid glyph — login already uses it. */}
 				<SheetsMark className="size-4 shrink-0 text-primary" />
-				<WorkbookName name={name} rename={renameDocument} />
+				<WorkbookName
+					name={name}
+					editing={renamingTitle}
+					onEditingChange={setRenamingTitle}
+					rename={renameDocument}
+				/>
 				<FileMenu
 					controller={controller}
 					workbookId={id}
 					name={name}
 					initialGoogleSpreadsheetId={googleSpreadsheetId}
+					onRename={() => setRenamingTitle(true)}
 				/>
 
 				<SaveIndicator
@@ -446,6 +541,29 @@ export function Workbook({
 					onDiscardLocal={() => void adoptServerState()}
 					onKeepLocal={keepLocalChanges}
 				/>
+
+				{/*
+				 * A shortcut list is worth nothing to a device with no
+				 * keyboard, and at 390px this header is already carrying eight
+				 * controls. Hidden by pointer capability, not by width: a
+				 * narrow window on a laptop still has the keys.
+				 */}
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<Button
+								variant="ghost"
+								size="icon"
+								className="hidden size-7 text-muted-foreground [@media(any-hover:hover)]:flex"
+								aria-label="Keyboard shortcuts"
+								onClick={() => setShortcutsOpen(true)}
+							>
+								<KeyboardIcon className="size-4" />
+							</Button>
+						}
+					/>
+					<TooltipContent>Keyboard shortcuts ({modKey}+/)</TooltipContent>
+				</Tooltip>
 
 				<Button
 					variant="ghost"
@@ -476,7 +594,25 @@ export function Workbook({
 						/>
 					) : null}
 					<div className="relative flex min-h-0 flex-1">
-						<div className="flex min-w-0 flex-1 flex-col">
+						{/*
+						 * `relative` anchors the find panel to the grid column,
+						 * NOT inside <Grid> itself. The grid container owns a
+						 * keydown handler that turns any printable key into a
+						 * cell edit, so a panel rendered as its child leaks
+						 * every keystroke typed into the search box straight
+						 * into the sheet — Enter opened the cell editor, and
+						 * typing edited cells. Sibling placement makes that
+						 * structurally impossible rather than something a
+						 * stopPropagation call has to remember.
+						 */}
+						<div className="relative flex min-w-0 flex-1 flex-col">
+							{find ? (
+								<FindBar
+									controller={controller}
+									mode={find}
+									onClose={() => setFind(null)}
+								/>
+							) : null}
 							<div className="min-h-0 flex-1">
 								<Grid
 									controller={controller}
@@ -495,18 +631,35 @@ export function Workbook({
 						 * from `md` up.
 						 */}
 						{chatOpen ? (
-							<aside
-								id="agent-panel"
-								aria-label="Agent"
-								className="absolute inset-y-0 right-0 z-[var(--z-sticky)] w-80 max-w-[85vw] border-l border-border bg-background md:static md:z-auto md:w-80 md:max-w-none xl:w-96"
-							>
-								<ChatPanel
-									controller={controller}
-									renameDocument={renameDocument}
+							<>
+								<AgentPanelResizer
+									width={panelWidth}
+									onWidth={setPanelWidth}
 								/>
-							</aside>
+								<aside
+									id="agent-panel"
+									aria-label="Agent"
+									// The dragged width applies from `md` up,
+									// where the panel sits beside the grid; below
+									// that it overlays at a fixed share of the
+									// viewport and the handle is hidden.
+									style={{
+										["--agent-panel-w" as string]: `${panelWidth}px`,
+									}}
+									className="absolute inset-y-0 right-0 z-[var(--z-sticky)] w-80 max-w-[85vw] border-l border-border bg-background md:static md:z-auto md:w-[var(--agent-panel-w)] md:max-w-none"
+								>
+									<ChatPanel
+										controller={controller}
+										renameDocument={renameDocument}
+									/>
+								</aside>
+							</>
 						) : null}
 					</div>
+					<ShortcutsDialog
+						open={shortcutsOpen}
+						onOpenChange={setShortcutsOpen}
+					/>
 				</>
 			) : (
 				<div
@@ -638,14 +791,32 @@ function SaveIndicator({
 	);
 }
 
+/**
+ * The document title: a label until you ask to change it.
+ *
+ * It used to be a permanent `<input>`, which had two problems that share one
+ * cause — an input cannot ellipsize. On a phone the header squeezed it until
+ * the name was cut mid-word ("Untitled workbo") with nothing marking the cut,
+ * and at any width the field looked like static text, so the one place you
+ * rename a workbook advertised nothing. A button truncates properly, says what
+ * it does, and hands over to a real input the moment it is asked to.
+ */
 function WorkbookName({
 	name,
+	editing,
+	onEditingChange,
 	rename,
 }: {
 	name: string;
+	editing: boolean;
+	onEditingChange: (editing: boolean) => void;
 	rename: (next: string) => Promise<boolean>;
 }) {
 	const [value, setValue] = useState(name);
+	// Escape must throw the draft away, and Escape's own blur is what runs the
+	// commit — so the two need a channel that isn't the async state update.
+	// Without it, Escape saved the very edit it was asked to discard.
+	const abandon = useRef(false);
 
 	// Reflect renames that land from elsewhere — the agent's rename_workbook
 	// tool, or a rollback — into the editable field.
@@ -654,6 +825,12 @@ function WorkbookName({
 	}, [name]);
 
 	const commit = async () => {
+		onEditingChange(false);
+		if (abandon.current) {
+			abandon.current = false;
+			setValue(name);
+			return;
+		}
 		const next = value.trim();
 		if (!next || next === name) {
 			setValue(next || name);
@@ -664,22 +841,44 @@ function WorkbookName({
 		await rename(next);
 	};
 
+	if (!editing) {
+		return (
+			<Tooltip>
+				<TooltipTrigger
+					render={
+						<button
+							type="button"
+							// The button's accessible name IS the workbook
+							// name; the tooltip supplies the verb, so neither
+							// has to be said twice.
+							className="h-7 min-w-0 max-w-64 truncate rounded-sm px-1.5 text-left text-sm font-medium hover:bg-accent/50"
+							onClick={() => onEditingChange(true)}
+						>
+							{name}
+						</button>
+					}
+				/>
+				<TooltipContent>Rename workbook</TooltipContent>
+			</Tooltip>
+		);
+	}
+
 	return (
 		<input
+			autoFocus
 			value={value}
-			// The header truncates; the full name stays reachable on hover.
-			title={value}
+			onFocus={(event) => event.currentTarget.select()}
 			onChange={(event) => setValue(event.target.value)}
 			onBlur={() => void commit()}
 			onKeyDown={(event) => {
 				if (event.key === "Enter") event.currentTarget.blur();
 				if (event.key === "Escape") {
-					setValue(name);
+					abandon.current = true;
 					event.currentTarget.blur();
 				}
 			}}
 			aria-label="Workbook name"
-			className="h-7 min-w-0 max-w-64 rounded-sm bg-transparent px-1.5 text-sm font-medium outline-none hover:bg-accent/50 focus:bg-accent/50 focus:ring-1 focus:ring-ring"
+			className="h-7 min-w-0 max-w-64 rounded-sm bg-transparent px-1.5 text-sm font-medium outline-none focus:bg-accent/50 focus:ring-1 focus:ring-ring"
 		/>
 	);
 }
