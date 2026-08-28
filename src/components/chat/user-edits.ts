@@ -51,6 +51,22 @@ export class UserEditLog {
 	/** Stable snapshot for useSyncExternalStore; a new array per change. */
 	getBursts = (): UserEditBurst[] => this.bursts;
 
+	/**
+	 * Drop the whole log — the transcript it was anchored to is gone.
+	 *
+	 * Only "New chat" calls this. The pending edits go with it on purpose: they
+	 * are context for a conversation that no longer exists, and carrying them
+	 * into a fresh one would open it by telling the agent about edits the user
+	 * made while talking to someone else.
+	 */
+	clear(): void {
+		if (this.bursts.length === 0 && this.pending.size === 0) return;
+		this.pending.clear();
+		this.pendingOverflow = 0;
+		this.bursts = [];
+		for (const listener of this.listeners) listener();
+	}
+
 	record(
 		changes: CellChange[],
 		sheetNameOf: (index: number) => string,
