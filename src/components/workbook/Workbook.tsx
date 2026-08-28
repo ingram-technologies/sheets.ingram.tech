@@ -40,6 +40,13 @@ type SaveState = "saved" | "dirty" | "saving" | "retrying" | "failed" | "conflic
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
 
+/**
+ * Where "back" goes. `/` is the public landing page — a signed-in user who
+ * followed the old back arrow landed on the marketing pitch for the product
+ * they already had open, with their workbooks nowhere in sight.
+ */
+const WORKBOOK_LIST = "/spreadsheets";
+
 /** `"3"` -> 3. Null when the header is missing or not a version ETag. */
 function parseEtag(header: string | null): number | null {
 	if (!header) return null;
@@ -117,6 +124,8 @@ export function Workbook({
 	/** Null = closed. "replace" opens the find panel with replace expanded. */
 	const [find, setFind] = useState<"find" | "replace" | null>(null);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
+	/** Lifted so the File menu's "Rename…" can open the header's title field. */
+	const [renamingTitle, setRenamingTitle] = useState(false);
 	const modKey = useModKeyLabel();
 	/** The most recent edit made from outside this tab, shown until dismissed. */
 	const [remoteActivity, setRemoteActivity] = useState<WorkbookActivity | null>(null);
@@ -482,7 +491,10 @@ export function Workbook({
 					<p className="text-sm text-destructive-ink" role="alert">
 						{loadError}
 					</p>
-					<Link href="/" className="text-sm text-muted-foreground underline">
+					<Link
+						href={WORKBOOK_LIST}
+						className="text-sm text-muted-foreground underline"
+					>
 						Back to workbooks
 					</Link>
 				</div>
@@ -493,21 +505,34 @@ export function Workbook({
 	return (
 		<div className="flex h-dvh flex-col bg-background text-foreground">
 			<header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
-				<Link
-					href="/"
-					aria-label="All workbooks"
-					className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-				>
-					<ArrowLeftIcon className="size-4" />
-				</Link>
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<Link
+								href={WORKBOOK_LIST}
+								aria-label="All workbooks"
+								className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+							>
+								<ArrowLeftIcon className="size-4" />
+							</Link>
+						}
+					/>
+					<TooltipContent>All workbooks</TooltipContent>
+				</Tooltip>
 				{/* The brand mark, not a generic grid glyph — login already uses it. */}
 				<SheetsMark className="size-4 shrink-0 text-primary" />
-				<WorkbookName name={name} rename={renameDocument} />
+				<WorkbookName
+					name={name}
+					editing={renamingTitle}
+					onEditingChange={setRenamingTitle}
+					rename={renameDocument}
+				/>
 				<FileMenu
 					controller={controller}
 					workbookId={id}
 					name={name}
 					initialGoogleSpreadsheetId={googleSpreadsheetId}
+					onRename={() => setRenamingTitle(true)}
 				/>
 
 				<SaveIndicator
@@ -766,14 +791,32 @@ function SaveIndicator({
 	);
 }
 
+/**
+ * The document title: a label until you ask to change it.
+ *
+ * It used to be a permanent `<input>`, which had two problems that share one
+ * cause — an input cannot ellipsize. On a phone the header squeezed it until
+ * the name was cut mid-word ("Untitled workbo") with nothing marking the cut,
+ * and at any width the field looked like static text, so the one place you
+ * rename a workbook advertised nothing. A button truncates properly, says what
+ * it does, and hands over to a real input the moment it is asked to.
+ */
 function WorkbookName({
 	name,
+	editing,
+	onEditingChange,
 	rename,
 }: {
 	name: string;
+	editing: boolean;
+	onEditingChange: (editing: boolean) => void;
 	rename: (next: string) => Promise<boolean>;
 }) {
 	const [value, setValue] = useState(name);
+	// Escape must throw the draft away, and Escape's own blur is what runs the
+	// commit — so the two need a channel that isn't the async state update.
+	// Without it, Escape saved the very edit it was asked to discard.
+	const abandon = useRef(false);
 
 	// Reflect renames that land from elsewhere — the agent's rename_workbook
 	// tool, or a rollback — into the editable field.
@@ -782,6 +825,12 @@ function WorkbookName({
 	}, [name]);
 
 	const commit = async () => {
+		onEditingChange(false);
+		if (abandon.current) {
+			abandon.current = false;
+			setValue(name);
+			return;
+		}
 		const next = value.trim();
 		if (!next || next === name) {
 			setValue(next || name);
@@ -792,22 +841,44 @@ function WorkbookName({
 		await rename(next);
 	};
 
+	if (!editing) {
+		return (
+			<Tooltip>
+				<TooltipTrigger
+					render={
+						<button
+							type="button"
+							// The button's accessible name IS the workbook
+							// name; the tooltip supplies the verb, so neither
+							// has to be said twice.
+							className="h-7 min-w-0 max-w-64 truncate rounded-sm px-1.5 text-left text-sm font-medium hover:bg-accent/50"
+							onClick={() => onEditingChange(true)}
+						>
+							{name}
+						</button>
+					}
+				/>
+				<TooltipContent>Rename workbook</TooltipContent>
+			</Tooltip>
+		);
+	}
+
 	return (
 		<input
+			autoFocus
 			value={value}
-			// The header truncates; the full name stays reachable on hover.
-			title={value}
+			onFocus={(event) => event.currentTarget.select()}
 			onChange={(event) => setValue(event.target.value)}
 			onBlur={() => void commit()}
 			onKeyDown={(event) => {
 				if (event.key === "Enter") event.currentTarget.blur();
 				if (event.key === "Escape") {
-					setValue(name);
+					abandon.current = true;
 					event.currentTarget.blur();
 				}
 			}}
 			aria-label="Workbook name"
-			className="h-7 min-w-0 max-w-64 rounded-sm bg-transparent px-1.5 text-sm font-medium outline-none hover:bg-accent/50 focus:bg-accent/50 focus:ring-1 focus:ring-ring"
+			className="h-7 min-w-0 max-w-64 rounded-sm bg-transparent px-1.5 text-sm font-medium outline-none focus:bg-accent/50 focus:ring-1 focus:ring-ring"
 		/>
 	);
 }
