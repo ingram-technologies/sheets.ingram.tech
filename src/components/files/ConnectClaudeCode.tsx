@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckIcon, CopyIcon, TerminalIcon } from "lucide-react";
+import { CheckIcon, CopyIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -24,9 +24,17 @@ import { toast } from "@/components/ui/toaster";
  *
  * The origin is read at runtime rather than hardcoded so the command is
  * correct on a preview deployment and on localhost, not just in production.
+ *
+ * Controlled: the trigger is a labelled item in the page's overflow menu, not
+ * a bare terminal glyph in the header action row.
  */
-export function ConnectClaudeCode() {
-	const [open, setOpen] = useState(false);
+export function ConnectClaudeCode({
+	open,
+	onOpenChange,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+}) {
 	const [origin, setOrigin] = useState("");
 	const [copied, setCopied] = useState(false);
 
@@ -47,64 +55,51 @@ export function ConnectClaudeCode() {
 	};
 
 	return (
-		<>
-			<Button
-				variant="ghost"
-				size="icon"
-				title="Connect Claude Code"
-				aria-label="Connect Claude Code"
-				className="size-9 text-muted-foreground"
-				onClick={() => setOpen(true)}
-			>
-				<TerminalIcon className="size-4" />
-			</Button>
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent>
+				<DialogHeader>
+					<DialogTitle>Connect Claude Code</DialogTitle>
+					<DialogDescription>
+						Give Claude Code the ability to work in these workbooks from
+						your terminal. Run this once:
+					</DialogDescription>
+				</DialogHeader>
 
-			<Dialog open={open} onOpenChange={setOpen}>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>Connect Claude Code</DialogTitle>
-						<DialogDescription>
-							Give Claude Code the ability to work in these workbooks from
-							your terminal. Run this once:
-						</DialogDescription>
-					</DialogHeader>
+				<div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3">
+					<code className="min-w-0 flex-1 font-mono text-xs break-all text-foreground">
+						{origin ? command : "…"}
+					</code>
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-7 shrink-0 px-2"
+						disabled={!origin}
+						onClick={() => void copy()}
+					>
+						{copied ? (
+							<CheckIcon className="size-3.5" />
+						) : (
+							<CopyIcon className="size-3.5" />
+						)}
+						<span className="sr-only">Copy command</span>
+					</Button>
+				</div>
 
-					<div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3">
-						<code className="min-w-0 flex-1 font-mono text-xs break-all text-foreground">
-							{origin ? command : "…"}
-						</code>
-						<Button
-							variant="outline"
-							size="sm"
-							className="h-7 shrink-0 px-2"
-							disabled={!origin}
-							onClick={() => void copy()}
-						>
-							{copied ? (
-								<CheckIcon className="size-3.5" />
-							) : (
-								<CopyIcon className="size-3.5" />
-							)}
-							<span className="sr-only">Copy command</span>
-						</Button>
-					</div>
-
-					<div className="space-y-2 text-xs text-muted-foreground">
-						<p>
-							Claude Code opens a browser to sign you in — there is no API
-							key to create or paste. It then gets five tools over your
-							workbooks: a structure-aware sketch instead of a cell dump,
-							budgeted range views, and a command language that answers
-							every edit with exactly which cells recalculated.
-						</p>
-						<p>
-							Edits appear here live. Leave a workbook open in a tab and
-							you will see the cells it touches flash as it works, with
-							the script it ran shown above the grid.
-						</p>
-					</div>
-				</DialogContent>
-			</Dialog>
-		</>
+				<div className="space-y-2 text-xs text-muted-foreground">
+					<p>
+						Claude Code opens a browser to sign you in — there is no API key
+						to create or paste. It then gets five tools over your workbooks:
+						a structure-aware sketch instead of a cell dump, budgeted range
+						views, and a command language that answers every edit with
+						exactly which cells recalculated.
+					</p>
+					<p>
+						Edits appear here live. Leave a workbook open in a tab and you
+						will see the cells it touches flash as it works, with the script
+						it ran shown above the grid.
+					</p>
+				</div>
+			</DialogContent>
+		</Dialog>
 	);
 }

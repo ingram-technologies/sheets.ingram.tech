@@ -57,10 +57,18 @@ type Listing = z.infer<typeof searchResponseSchema>["files"][number];
  * AND accepts a pasted URL/id; plus "Browse Google Drive" via the Google
  * Picker for everything else. Importing establishes the 1:1 link, so "Save
  * to Google Sheets" writes back to the same spreadsheet.
+ *
+ * Fully controlled: the trigger lives in the page's "Import" menu, and a
+ * dialog rendered inside that menu would unmount the moment the menu closed.
  */
-export function OpenFromGoogle() {
+export function OpenFromGoogle({
+	open,
+	onOpenChange,
+}: {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+}) {
 	const router = useRouter();
-	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
 	const [results, setResults] = useState<Listing[] | null>(null);
 	const [searching, setSearching] = useState(false);
@@ -163,7 +171,7 @@ export function OpenFromGoogle() {
 				throw new Error(apiError(body) ?? "Google token unavailable");
 			}
 			const { accessToken } = tokenResponseSchema.parse(body);
-			setOpen(false);
+			onOpenChange(false);
 			const picked = await pickSpreadsheet(picker, accessToken);
 			if (!picked) return;
 			toast.promise(importSheet(picked), {
@@ -184,120 +192,114 @@ export function OpenFromGoogle() {
 	};
 
 	return (
-		<>
-			<Button variant="outline" onClick={() => setOpen(true)}>
-				<FileSpreadsheetIcon className="size-4" />
-				Open from Google Sheets
-			</Button>
-			<Dialog
-				open={open}
-				onOpenChange={(next) => {
-					if (importing) return;
-					setOpen(next);
-					if (!next) reset();
-				}}
-			>
-				<DialogContent className="max-w-lg gap-3">
-					<DialogHeader>
-						<DialogTitle>Open from Google Sheets</DialogTitle>
-						<DialogDescription>
-							The imported workbook stays linked — saving sends changes
-							back to the same spreadsheet.
-						</DialogDescription>
-					</DialogHeader>
+		<Dialog
+			open={open}
+			onOpenChange={(next) => {
+				if (importing) return;
+				onOpenChange(next);
+				if (!next) reset();
+			}}
+		>
+			<DialogContent className="max-w-lg gap-3">
+				<DialogHeader>
+					<DialogTitle>Open from Google Sheets</DialogTitle>
+					<DialogDescription>
+						The imported workbook stays linked — saving sends changes back
+						to the same spreadsheet.
+					</DialogDescription>
+				</DialogHeader>
 
-					<div className="relative">
-						<SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							autoFocus
-							className="pl-8"
-							placeholder="Search your spreadsheets, or paste a link…"
-							value={query}
-							onChange={(event) => setQuery(event.target.value)}
-							onKeyDown={(event) => {
-								if (event.key !== "Enter" || importing) return;
-								if (linkedId) void importSheet(linkedId);
-								else if (results?.length === 1 && results[0]) {
-									void importSheet(results[0].id);
-								}
-							}}
-							disabled={importing}
-						/>
-					</div>
+				<div className="relative">
+					<SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+					<Input
+						autoFocus
+						className="pl-8"
+						placeholder="Search your spreadsheets, or paste a link…"
+						value={query}
+						onChange={(event) => setQuery(event.target.value)}
+						onKeyDown={(event) => {
+							if (event.key !== "Enter" || importing) return;
+							if (linkedId) void importSheet(linkedId);
+							else if (results?.length === 1 && results[0]) {
+								void importSheet(results[0].id);
+							}
+						}}
+						disabled={importing}
+					/>
+				</div>
 
-					{/* max-h, not just min-h: without a ceiling a long result
+				{/* max-h, not just min-h: without a ceiling a long result
 					    list grew the dialog past the viewport. */}
-					<div
-						role="listbox"
-						aria-label="Search results"
-						aria-busy={searching}
-						className="max-h-64 min-h-48 overflow-y-auto rounded-md border border-border"
-					>
-						{scopeMissing ? (
-							<ScopePrompt />
-						) : linkedId ? (
-							<ResultRow
-								icon={Link2Icon}
-								title="Import from this link"
-								subtitle={linkedId}
-								disabled={importing}
-								onClick={() => void importSheet(linkedId)}
-							/>
-						) : searching && !results ? (
-							<SearchSkeleton />
-						) : results && results.length > 0 ? (
-							<div className={searching ? "opacity-60" : undefined}>
-								{results.map((file) => (
-									<ResultRow
-										key={file.id}
-										icon={FileSpreadsheetIcon}
-										title={file.name}
-										subtitle={formatModified(file.modifiedTime)}
-										disabled={importing}
-										onClick={() => void importSheet(file.id)}
-									/>
-								))}
-							</div>
-						) : (
-							<p className="px-4 py-8 text-center text-sm text-muted-foreground">
-								{query
-									? "No matches. Search only sees spreadsheets this app created or opened before — paste a link or browse Drive for the rest."
-									: "Spreadsheets you save or open here will show up for quick access. Paste a link or browse Drive to get started."}
-							</p>
-						)}
-					</div>
+				<div
+					role="listbox"
+					aria-label="Search results"
+					aria-busy={searching}
+					className="max-h-64 min-h-48 overflow-y-auto rounded-md border border-border"
+				>
+					{scopeMissing ? (
+						<ScopePrompt />
+					) : linkedId ? (
+						<ResultRow
+							icon={Link2Icon}
+							title="Import from this link"
+							subtitle={linkedId}
+							disabled={importing}
+							onClick={() => void importSheet(linkedId)}
+						/>
+					) : searching && !results ? (
+						<SearchSkeleton />
+					) : results && results.length > 0 ? (
+						<div className={searching ? "opacity-60" : undefined}>
+							{results.map((file) => (
+								<ResultRow
+									key={file.id}
+									icon={FileSpreadsheetIcon}
+									title={file.name}
+									subtitle={formatModified(file.modifiedTime)}
+									disabled={importing}
+									onClick={() => void importSheet(file.id)}
+								/>
+							))}
+						</div>
+					) : (
+						<p className="px-4 py-8 text-center text-sm text-muted-foreground">
+							{query
+								? "No matches. Search only sees spreadsheets this app created or opened before — paste a link or browse Drive for the rest."
+								: "Spreadsheets you save or open here will show up for quick access. Paste a link or browse Drive to get started."}
+						</p>
+					)}
+				</div>
 
-					<div className="flex items-center justify-between">
-						{picker ? (
-							<Button
-								variant="ghost"
-								size="sm"
-								className="text-muted-foreground"
-								disabled={browsing || importing}
-								onClick={() => void browseDrive()}
-							>
-								<FolderSearchIcon className="size-4" />
-								{browsing ? "Opening Drive…" : "Browse Google Drive"}
-							</Button>
-						) : (
-							<span />
-						)}
-						{/* Import runs wasm + two network round-trips with the
+				<div className="flex items-center justify-between">
+					{picker ? (
+						<Button
+							variant="ghost"
+							size="sm"
+							className="text-muted-foreground"
+							disabled={browsing || importing}
+							onClick={() => void browseDrive()}
+						>
+							<FolderSearchIcon className="size-4" />
+							{browsing ? "Opening Drive…" : "Browse Google Drive"}
+						</Button>
+					) : (
+						<span />
+					)}
+					{/* Import runs wasm + two network round-trips with the
 						    dialog locked shut; an 11px word was the only sign
 						    anything was happening. */}
-						{importing ? (
-							<span
-								className="flex items-center gap-1.5 text-xs text-muted-foreground"
-								role="status"
-							>
-								<Loader2Icon className="size-3 animate-spin" />
-								Importing…
-							</span>
-						) : null}
-					</div>
-				</DialogContent>
-			</Dialog>
-		</>
+					{importing ? (
+						<span
+							className="flex items-center gap-1.5 text-xs text-muted-foreground"
+							role="status"
+						>
+							<Loader2Icon className="size-3 animate-spin" />
+							Importing…
+						</span>
+					) : null}
+				</div>
+			</DialogContent>
+		</Dialog>
 	);
 }
 
