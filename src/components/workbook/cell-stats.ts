@@ -31,6 +31,9 @@ export interface SelectionStats {
 	filled: number;
 	/** Numeric cells whose value could not be recovered exactly (e.g. dates). */
 	skipped: number;
+	/** Smallest and largest contributing value; null when none contributed. */
+	min: number | null;
+	max: number | null;
 }
 
 /**
@@ -107,6 +110,8 @@ export function selectionStats(
 	let numeric = 0;
 	let filled = 0;
 	let skipped = 0;
+	let min: number | null = null;
+	let max: number | null = null;
 
 	for (let row = range.startRow; row <= range.endRow; row++) {
 		for (let col = range.startCol; col <= range.endCol; col++) {
@@ -119,7 +124,11 @@ export function selectionStats(
 			}
 			sum += value;
 			numeric += 1;
+			// Seeded from the first contributor rather than ±Infinity, so a
+			// selection with no numbers reports null instead of Infinity.
+			if (min === null || value < min) min = value;
+			if (max === null || value > max) max = value;
 		}
 	}
-	return { sum, numeric, filled, skipped };
+	return { sum, numeric, filled, skipped, min, max };
 }
