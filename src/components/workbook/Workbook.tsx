@@ -19,6 +19,7 @@ import { toast } from "@/components/ui/toaster";
 import { WorkbookController } from "./controller";
 import { ensureIronCalc, Model } from "./ironcalc";
 import { FileMenu } from "./FileMenu";
+import { FindBar } from "./FindBar";
 import { FormulaBar } from "./FormulaBar";
 import type { EditingState } from "./Grid";
 import { Grid } from "./Grid";
@@ -92,6 +93,8 @@ export function Workbook({
 	const [editing, setEditing] = useState<EditingState | null>(null);
 	const [name, setName] = useState(initialName);
 	const [chatOpen, setChatOpen] = useState(true);
+	/** Null = closed. "replace" opens the find panel with replace expanded. */
+	const [find, setFind] = useState<"find" | "replace" | null>(null);
 	/** The most recent edit made from outside this tab, shown until dismissed. */
 	const [remoteActivity, setRemoteActivity] = useState<WorkbookActivity | null>(null);
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -382,6 +385,42 @@ export function Workbook({
 		};
 	}, [controller, save]);
 
+	/**
+	 * App-level keys, bound to the window rather than the grid because they
+	 * must work from the formula bar and the agent panel too.
+	 *
+	 * Each of these otherwise reaches the *browser* and does the wrong thing:
+	 * Ctrl+S offers to save the page as HTML, and Ctrl+F opens a find bar that
+	 * searches the DOM — which, for a canvas grid, is an empty document. In a
+	 * spreadsheet both read as the app being broken.
+	 */
+	useEffect(() => {
+		const onKeyDown = (event: KeyboardEvent) => {
+			const mod = event.ctrlKey || event.metaKey;
+			const key = event.key.toLowerCase();
+			if (mod && key === "s") {
+				event.preventDefault();
+				if (saveStateRef.current !== "saved") void save();
+				return;
+			}
+			if (mod && (key === "f" || key === "h")) {
+				event.preventDefault();
+				setFind(key === "h" ? "replace" : "find");
+				return;
+			}
+			// Closing Find lives here so it works wherever focus went — the
+			// panel, the grid, or a cell you navigated to from a hit. The cell
+			// editor stops Escape before it reaches the window, so cancelling
+			// an edit does not also dismiss the search.
+			if (event.key === "Escape") {
+				setFind(null);
+				return;
+			}
+		};
+		window.addEventListener("keydown", onKeyDown);
+		return () => window.removeEventListener("keydown", onKeyDown);
+	}, [save]);
+
 	// Flush on tab hide; warn before closing with unsaved changes.
 	useEffect(() => {
 		const onVisibility = () => {
@@ -476,7 +515,25 @@ export function Workbook({
 						/>
 					) : null}
 					<div className="relative flex min-h-0 flex-1">
-						<div className="flex min-w-0 flex-1 flex-col">
+						{/*
+						 * `relative` anchors the find panel to the grid column,
+						 * NOT inside <Grid> itself. The grid container owns a
+						 * keydown handler that turns any printable key into a
+						 * cell edit, so a panel rendered as its child leaks
+						 * every keystroke typed into the search box straight
+						 * into the sheet — Enter opened the cell editor, and
+						 * typing edited cells. Sibling placement makes that
+						 * structurally impossible rather than something a
+						 * stopPropagation call has to remember.
+						 */}
+						<div className="relative flex min-w-0 flex-1 flex-col">
+							{find ? (
+								<FindBar
+									controller={controller}
+									mode={find}
+									onClose={() => setFind(null)}
+								/>
+							) : null}
 							<div className="min-h-0 flex-1">
 								<Grid
 									controller={controller}

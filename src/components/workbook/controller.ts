@@ -6,7 +6,7 @@ import type {
 	SelectedView,
 	WorksheetProperties,
 } from "./ironcalc";
-import type { CellRange } from "@/lib/a1";
+import type { CellRange, CellRef } from "@/lib/a1";
 import { cellCount, formatCell, parseCell } from "@/lib/a1";
 
 /**
@@ -83,6 +83,7 @@ export class WorkbookController {
 	readonly model: Model;
 
 	private version = 0;
+	private contentVersion = 0;
 	private revealSeq = 0;
 	private listeners = new Set<() => void>();
 	private dirtyListeners = new Set<() => void>();
@@ -109,6 +110,14 @@ export class WorkbookController {
 	};
 
 	getVersion = (): number => this.version;
+
+	/**
+	 * Bumps on content mutations only, where `version` also counts selection
+	 * moves. Find memoises its match scan on this: keying on `version` would
+	 * re-scan the sheet on every arrow key, which is the whole cost of the
+	 * feature paid for nothing.
+	 */
+	getContentVersion = (): number => this.contentVersion;
 
 	getRevealSeq = (): number => this.revealSeq;
 
@@ -163,6 +172,7 @@ export class WorkbookController {
 	): MutationResult {
 		const sheet = this.model.getSelectedSheet();
 		const before = this.snapshot(sheet);
+		this.contentVersion += 1;
 		try {
 			fn(this.model);
 		} catch (error) {
@@ -263,6 +273,25 @@ export class WorkbookController {
 		}
 		if (maxRow === 0) return null;
 		return { startRow: 1, startCol: 1, endRow: maxRow, endCol: maxCol };
+	}
+
+	/**
+	 * Every non-empty cell on a sheet, row-major (the order Find walks).
+	 *
+	 * Driven by the engine's per-column data index rather than a scan of the
+	 * used range: a sheet with 40 rows in column A and one cell in column Z has
+	 * a used range of 1040 cells but only 41 filled ones, and Find must not pay
+	 * a wasm call for the other 999.
+	 */
+	filledCells(sheet: number): CellRef[] {
+		const refs: CellRef[] = [];
+		for (let col = 1; col <= USED_RANGE_COL_SCAN; col++) {
+			for (const row of this.model.getRowsWithData(sheet, col)) {
+				refs.push({ row, col });
+			}
+		}
+		refs.sort((a, b) => a.row - b.row || a.col - b.col);
+		return refs;
 	}
 
 	// ── delta echo ──
