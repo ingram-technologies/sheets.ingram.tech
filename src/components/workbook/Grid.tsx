@@ -92,6 +92,11 @@ export function Grid({
 		controller.getVersion,
 		controller.getVersion,
 	);
+	const revealSeq = useSyncExternalStore(
+		controller.subscribe,
+		controller.getRevealSeq,
+		controller.getRevealSeq,
+	);
 
 	const sheet = controller.selectedSheet();
 	const geometry = controller.sheetGeometry(sheet);
@@ -297,6 +302,13 @@ export function Grid({
 			scroller.scrollTop = bottom - viewHeight;
 		}
 	}, [controller]);
+
+	// Something outside the grid asked to be taken to the selection — a Find
+	// hit, or a range clicked in the agent transcript. Never fires on an
+	// ordinary selection move; see WorkbookController.reveal.
+	useEffect(() => {
+		if (revealSeq > 0) ensureVisible();
+	}, [ensureVisible, revealSeq]);
 
 	// ── editing ──
 

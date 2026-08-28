@@ -83,6 +83,7 @@ export class WorkbookController {
 	readonly model: Model;
 
 	private version = 0;
+	private revealSeq = 0;
 	private listeners = new Set<() => void>();
 	private dirtyListeners = new Set<() => void>();
 	private mutationListeners = new Set<
@@ -108,6 +109,22 @@ export class WorkbookController {
 	};
 
 	getVersion = (): number => this.version;
+
+	getRevealSeq = (): number => this.revealSeq;
+
+	/**
+	 * Ask the grid to scroll the current selection into view.
+	 *
+	 * Deliberately explicit rather than "scroll whenever the selection moves":
+	 * the agent moves the selection constantly, and a viewport that chases it
+	 * would yank the sheet out from under a user who is reading elsewhere. Only
+	 * a gesture that *means* "take me there" — Find, or clicking a range in the
+	 * transcript — calls this.
+	 */
+	reveal(): void {
+		this.revealSeq += 1;
+		this.notify();
+	}
 
 	/** Fires on content mutations only (not view changes) — drives autosave. */
 	onDirty(listener: () => void): () => void {
