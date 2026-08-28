@@ -7,6 +7,13 @@ import { cn } from "@/lib/utils";
  * (e.g. a mobile-nav trigger), optional icon chip, title + description, and a
  * trailing actions slot. Keep page-level actions here — not floating in the
  * body — so every screen puts them in the same place.
+ *
+ * Local delta (upstream candidate, alongside the widened icon type): the bar
+ * wraps instead of being a fixed-height single row. The registry version pins
+ * `h-14` and marks the actions `shrink-0`, so a page with several actions
+ * pushes them straight off a phone viewport — the workbook list rendered ~736px
+ * of header inside 390px, with the page title squeezed to nothing. Wrapping
+ * costs a taller header on small screens and keeps every control reachable.
  */
 export function PageHeader({
 	title,
@@ -33,7 +40,7 @@ export function PageHeader({
 		<header
 			data-slot="page-header"
 			className={cn(
-				"flex h-14 shrink-0 items-center justify-between gap-4 border-b px-4 sm:px-6",
+				"flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-3 border-b px-4 sm:px-6",
 				className,
 			)}
 		>
@@ -59,7 +66,7 @@ export function PageHeader({
 				</div>
 			</div>
 			{actions ? (
-				<div className="flex shrink-0 items-center gap-3">{actions}</div>
+				<div className="flex flex-wrap items-center gap-3">{actions}</div>
 			) : null}
 		</header>
 	);
