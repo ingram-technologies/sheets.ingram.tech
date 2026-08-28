@@ -10,11 +10,14 @@ import {
 } from "react";
 
 import type { CellRange } from "@/lib/a1";
-import { MAX_COLUMN, MAX_ROW } from "@/lib/a1";
+import { MAX_COLUMN, MAX_ROW, rangeContains, rangeHeight, rangeWidth } from "@/lib/a1";
 
 import type { CommitMove } from "./CellEditor";
 import { CellEditor } from "./CellEditor";
 import type { WorkbookController } from "./controller";
+import type { GridMenuItem } from "./GridMenu";
+import { GridMenu } from "./GridMenu";
+import { useModKeyLabel } from "./mod-key";
 import {
 	cellRect,
 	COL_HEADER_HEIGHT,
@@ -86,6 +89,7 @@ export function Grid({
 		axis: "col" | "row";
 		pos: number;
 	} | null>(null);
+	const modKey = useModKeyLabel();
 
 	const version = useSyncExternalStore(
 		controller.subscribe,
@@ -565,14 +569,25 @@ export function Grid({
 		(event: React.MouseEvent<HTMLDivElement>) => {
 			event.preventDefault();
 			const hit = locate(event.clientX, event.clientY);
-			if (!hit) return;
+			if (!hit || hit.zone === "corner") return;
 			if (hit.zone === "colHeader") {
 				setMenu({ x: hit.x, y: hit.y, kind: "col", index: hit.col });
-			} else if (hit.zone === "rowHeader") {
-				setMenu({ x: hit.x, y: hit.y, kind: "row", index: hit.row });
+				return;
 			}
+			if (hit.zone === "rowHeader") {
+				setMenu({ x: hit.x, y: hit.y, kind: "row", index: hit.row });
+				return;
+			}
+			// Right-clicking a cell used to do nothing at all, so the grid's
+			// primary surface had no menu — cut/copy/paste and insert/delete
+			// were keyboard-or-nothing. Right-clicking outside the current
+			// selection moves to that cell first, as every spreadsheet does.
+			if (!rangeContains(selectionRange(), hit.row, hit.col)) {
+				controller.view((model) => model.setSelectedCell(hit.row, hit.col));
+			}
+			setMenu({ x: hit.x, y: hit.y, kind: "cell", index: hit.row });
 		},
-		[locate],
+		[controller, locate, selectionRange],
 	);
 
 	// ── clipboard ──
@@ -595,16 +610,56 @@ export function Grid({
 		[controller],
 	);
 
-	const paste = useCallback(async () => {
-		let text = "";
+	/** The clipboard's text, preferring the OS and falling back to our own. */
+	const clipboardText = useCallback(async (): Promise<string> => {
 		try {
-			text = await navigator.clipboard.readText();
+			return await navigator.clipboard.readText();
 		} catch {
 			// No clipboard read permission — fall back to the internal buffer.
-			text = clipboardRef.current?.csv ?? "";
+			return clipboardRef.current?.csv ?? "";
 		}
-		const internal = clipboardRef.current;
+	}, []);
+
+	/**
+	 * Paste the clipboard as plain values.
+	 *
+	 * `pasteCsvText` is the whole implementation, and it is exact rather than
+	 * approximate: the engine's own clipboard payload is already the *computed*
+	 * values, tab-separated — copying `5` above `=A30*3` puts `"5\n15"` on the
+	 * clipboard, not the formula. So handing that text back to the engine is
+	 * precisely "values only", in one operation and therefore one undo step,
+	 * with no cell-by-cell value recovery to get wrong.
+	 *
+	 * (Despite the name, the engine parses TAB-separated text here — verified
+	 * against the running build; a comma-separated row lands in one cell.)
+	 *
+	 * A pending cut is deliberately left pending: this pastes a copy and the
+	 * source stays put, because the alternative — clearing it in a second
+	 * mutation — would make one gesture take two undos to reverse.
+	 */
+	const pasteValues = useCallback(async () => {
+		const text = await clipboardText();
+		if (!text) return;
 		const view = controller.selectedView();
+		controller.mutate((model) => {
+			model.pasteCsvText(
+				{
+					sheet: view.sheet,
+					row: view.row,
+					column: view.column,
+					width: 1,
+					height: 1,
+				},
+				text,
+			);
+		});
+	}, [clipboardText, controller]);
+
+	const paste = useCallback(async () => {
+		const text = await clipboardText();
+		const internal = clipboardRef.current;
+		// Ours, and still the thing on the clipboard: take the rich path, which
+		// carries formulas and styles across.
 		if (internal && internal.csv === text) {
 			controller.mutate((model) => {
 				model.pasteFromClipboard(
@@ -615,21 +670,23 @@ export function Grid({
 				);
 			});
 			if (internal.cut) clipboardRef.current = null;
-		} else if (text) {
-			controller.mutate((model) => {
-				model.pasteCsvText(
-					{
-						sheet: view.sheet,
-						row: view.row,
-						column: view.column,
-						width: 1,
-						height: 1,
-					},
-					text,
-				);
-			});
+			return;
 		}
-	}, [controller]);
+		await pasteValues();
+	}, [clipboardText, controller, pasteValues]);
+
+	const clearSelection = useCallback(() => {
+		const range = selectionRange();
+		controller.mutate((model) =>
+			model.rangeClearContents(
+				model.getSelectedSheet(),
+				range.startRow,
+				range.startCol,
+				range.endRow,
+				range.endCol,
+			),
+		);
+	}, [controller, selectionRange]);
 
 	// ── keyboard ──
 
@@ -677,16 +734,31 @@ export function Grid({
 			}
 			if (key === "Delete" || key === "Backspace") {
 				event.preventDefault();
-				const range = selectionRange();
-				controller.mutate((model) =>
-					model.rangeClearContents(
-						model.getSelectedSheet(),
-						range.startRow,
-						range.startCol,
-						range.endRow,
-						range.endCol,
-					),
-				);
+				clearSelection();
+				return;
+			}
+			if (key === "Escape" && menu) {
+				event.preventDefault();
+				setMenu(null);
+				return;
+			}
+			// The context menu on the keyboard's own terms. Without this the
+			// menu built above is mouse-only, which makes half the grid's verbs
+			// mouse-only too.
+			if (key === "ContextMenu" || (event.shiftKey && key === "F10")) {
+				event.preventDefault();
+				const rect = cellRect(controller, view.sheet, view.row, view.column, {
+					scrollX: scrollRef.current.x,
+					scrollY: scrollRef.current.y,
+					width: 0,
+					height: 0,
+				});
+				setMenu({
+					x: rect.x + rect.w / 2,
+					y: rect.y + rect.h,
+					kind: "cell",
+					index: view.row,
+				});
 				return;
 			}
 			if (key === "PageDown" || key === "PageUp") {
@@ -702,6 +774,22 @@ export function Grid({
 				event.preventDefault();
 				controller.view((model) =>
 					model.setSelectedCell(mod ? 1 : view.row, 1),
+				);
+				ensureVisible();
+				return;
+			}
+			// End's counterpart to Home, which existed on its own — so the
+			// grid could take you to the start of the data but never the end.
+			// Both land on the used range, not the virtual extent, because the
+			// extent grows as you scroll and "the end" would keep moving.
+			if (key === "End") {
+				event.preventDefault();
+				const used = controller.usedRange(view.sheet);
+				controller.view((model) =>
+					model.setSelectedCell(
+						mod ? (used?.endRow ?? 1) : view.row,
+						used?.endCol ?? 1,
+					),
 				);
 				ensureVisible();
 				return;
@@ -735,6 +823,14 @@ export function Grid({
 				copySelection(true);
 				return;
 			}
+			// Shift+V before plain V: with Shift held the browser reports "V",
+			// so the two never collide, but the order keeps that non-obvious
+			// fact from being load-bearing.
+			if (mod && event.shiftKey && (key === "v" || key === "V")) {
+				event.preventDefault();
+				void pasteValues();
+				return;
+			}
 			if (mod && key === "v") {
 				void paste();
 				return;
@@ -766,13 +862,16 @@ export function Grid({
 			}
 		},
 		[
+			clearSelection,
 			controller,
 			copySelection,
 			editing,
 			ensureVisible,
 			geometry.cols,
 			geometry.rows,
+			menu,
 			paste,
+			pasteValues,
 			selectionRange,
 			startEditing,
 		],
@@ -780,29 +879,45 @@ export function Grid({
 
 	// ── row/col menu actions ──
 
-	const menuActions = useMemo(() => {
+	const menuActions = useMemo((): GridMenuItem[] => {
 		if (!menu) return [];
+		// Labels count what the gesture will actually touch, so "Delete 3 rows"
+		// can never delete one — the old menu said "Delete row" whatever was
+		// selected.
+		const range = selectionRange();
+		const rows = rangeHeight(range);
+		const cols = rangeWidth(range);
+		const plural = (count: number, noun: string) =>
+			count === 1 ? noun : `${count} ${noun}s`;
+
 		if (menu.kind === "col") {
 			return [
 				{
-					label: "Insert column left",
+					label: `Insert ${plural(cols, "column")} left`,
 					run: () =>
 						controller.mutate((m) =>
-							m.insertColumns(m.getSelectedSheet(), menu.index, 1),
+							m.insertColumns(m.getSelectedSheet(), menu.index, cols),
 						),
 				},
 				{
-					label: "Insert column right",
+					label: `Insert ${plural(cols, "column")} right`,
 					run: () =>
 						controller.mutate((m) =>
-							m.insertColumns(m.getSelectedSheet(), menu.index + 1, 1),
+							m.insertColumns(m.getSelectedSheet(), menu.index + 1, cols),
 						),
 				},
 				{
-					label: "Delete column",
+					label: "Clear contents",
+					hint: "Delete",
+					separated: true,
+					run: clearSelection,
+				},
+				{
+					label: `Delete ${plural(cols, "column")}`,
+					destructive: true,
 					run: () =>
 						controller.mutate((m) =>
-							m.deleteColumns(m.getSelectedSheet(), menu.index, 1),
+							m.deleteColumns(m.getSelectedSheet(), menu.index, cols),
 						),
 				},
 			];
@@ -810,30 +925,95 @@ export function Grid({
 		if (menu.kind === "row") {
 			return [
 				{
-					label: "Insert row above",
+					label: `Insert ${plural(rows, "row")} above`,
 					run: () =>
 						controller.mutate((m) =>
-							m.insertRows(m.getSelectedSheet(), menu.index, 1),
+							m.insertRows(m.getSelectedSheet(), menu.index, rows),
 						),
 				},
 				{
-					label: "Insert row below",
+					label: `Insert ${plural(rows, "row")} below`,
 					run: () =>
 						controller.mutate((m) =>
-							m.insertRows(m.getSelectedSheet(), menu.index + 1, 1),
+							m.insertRows(m.getSelectedSheet(), menu.index + 1, rows),
 						),
 				},
 				{
-					label: "Delete row",
+					label: "Clear contents",
+					hint: "Delete",
+					separated: true,
+					run: clearSelection,
+				},
+				{
+					label: `Delete ${plural(rows, "row")}`,
+					destructive: true,
 					run: () =>
 						controller.mutate((m) =>
-							m.deleteRows(m.getSelectedSheet(), menu.index, 1),
+							m.deleteRows(m.getSelectedSheet(), menu.index, rows),
 						),
 				},
 			];
 		}
-		return [];
-	}, [controller, menu]);
+		return [
+			{ label: "Cut", hint: `${modKey}+X`, run: () => copySelection(true) },
+			{ label: "Copy", hint: `${modKey}+C`, run: () => copySelection(false) },
+			{ label: "Paste", hint: `${modKey}+V`, run: () => void paste() },
+			{
+				// The verb that breaks a formula's link to its source — the
+				// most-reached-for clipboard action in a spreadsheet after the
+				// first three, and until now not reachable at all.
+				label: "Paste values only",
+				hint: `${modKey}+Shift+V`,
+				run: () => void pasteValues(),
+			},
+			{
+				label: `Insert ${plural(rows, "row")} above`,
+				separated: true,
+				run: () =>
+					controller.mutate((m) =>
+						m.insertRows(m.getSelectedSheet(), range.startRow, rows),
+					),
+			},
+			{
+				label: `Insert ${plural(cols, "column")} left`,
+				run: () =>
+					controller.mutate((m) =>
+						m.insertColumns(m.getSelectedSheet(), range.startCol, cols),
+					),
+			},
+			{
+				label: "Clear contents",
+				hint: "Delete",
+				separated: true,
+				run: clearSelection,
+			},
+			{
+				label: `Delete ${plural(rows, "row")}`,
+				destructive: true,
+				run: () =>
+					controller.mutate((m) =>
+						m.deleteRows(m.getSelectedSheet(), range.startRow, rows),
+					),
+			},
+			{
+				label: `Delete ${plural(cols, "column")}`,
+				destructive: true,
+				run: () =>
+					controller.mutate((m) =>
+						m.deleteColumns(m.getSelectedSheet(), range.startCol, cols),
+					),
+			},
+		];
+	}, [
+		clearSelection,
+		controller,
+		copySelection,
+		menu,
+		modKey,
+		paste,
+		pasteValues,
+		selectionRange,
+	]);
 
 	const totalWidth = (geometry.colOffsets[geometry.cols] ?? 0) + ROW_HEADER_WIDTH;
 	const totalHeight = (geometry.rowOffsets[geometry.rows] ?? 0) + COL_HEADER_HEIGHT;
@@ -894,24 +1074,15 @@ export function Grid({
 				/>
 			) : null}
 			{menu ? (
-				<div
-					className="absolute z-[var(--z-dropdown)] min-w-44 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md"
-					style={{ left: menu.x, top: menu.y }}
-				>
-					{menuActions.map((action) => (
-						<button
-							key={action.label}
-							type="button"
-							className="block w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
-							onClick={() => {
-								action.run();
-								setMenu(null);
-							}}
-						>
-							{action.label}
-						</button>
-					))}
-				</div>
+				<GridMenu
+					x={menu.x}
+					y={menu.y}
+					items={menuActions}
+					onClose={() => {
+						setMenu(null);
+						containerRef.current?.focus();
+					}}
+				/>
 			) : null}
 		</div>
 	);
