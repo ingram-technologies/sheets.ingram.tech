@@ -1,6 +1,11 @@
 "use client";
 
-import { ArrowLeftIcon, PanelRightCloseIcon, PanelRightOpenIcon } from "lucide-react";
+import {
+	ArrowLeftIcon,
+	KeyboardIcon,
+	PanelRightCloseIcon,
+	PanelRightOpenIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -14,6 +19,7 @@ import { UserMenu } from "@/components/auth/UserMenu";
 import { SheetsMark } from "@/components/brand/sheets-mark";
 import { ChatPanel } from "@/components/chat/ChatPanel";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/toaster";
 
 import { WorkbookController } from "./controller";
@@ -23,7 +29,9 @@ import { FindBar } from "./FindBar";
 import { FormulaBar } from "./FormulaBar";
 import type { EditingState } from "./Grid";
 import { Grid } from "./Grid";
+import { useModKeyLabel } from "./mod-key";
 import { SheetTabs } from "./SheetTabs";
+import { ShortcutsDialog } from "./ShortcutsDialog";
 import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
 
@@ -95,6 +103,8 @@ export function Workbook({
 	const [chatOpen, setChatOpen] = useState(true);
 	/** Null = closed. "replace" opens the find panel with replace expanded. */
 	const [find, setFind] = useState<"find" | "replace" | null>(null);
+	const [shortcutsOpen, setShortcutsOpen] = useState(false);
+	const modKey = useModKeyLabel();
 	/** The most recent edit made from outside this tab, shown until dismissed. */
 	const [remoteActivity, setRemoteActivity] = useState<WorkbookActivity | null>(null);
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -416,6 +426,14 @@ export function Workbook({
 				setFind(null);
 				return;
 			}
+			// Ctrl+/ (Google Sheets' own binding), not a bare "?". The grid
+			// turns every printable key into the start of a cell edit, so "?"
+			// would open this list AND leave a "?" being typed into the cell
+			// behind it. A modifier keeps the two apart.
+			if (mod && key === "/") {
+				event.preventDefault();
+				setShortcutsOpen(true);
+			}
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
@@ -485,6 +503,29 @@ export function Workbook({
 					onDiscardLocal={() => void adoptServerState()}
 					onKeepLocal={keepLocalChanges}
 				/>
+
+				{/*
+				 * A shortcut list is worth nothing to a device with no
+				 * keyboard, and at 390px this header is already carrying eight
+				 * controls. Hidden by pointer capability, not by width: a
+				 * narrow window on a laptop still has the keys.
+				 */}
+				<Tooltip>
+					<TooltipTrigger
+						render={
+							<Button
+								variant="ghost"
+								size="icon"
+								className="hidden size-7 text-muted-foreground [@media(any-hover:hover)]:flex"
+								aria-label="Keyboard shortcuts"
+								onClick={() => setShortcutsOpen(true)}
+							>
+								<KeyboardIcon className="size-4" />
+							</Button>
+						}
+					/>
+					<TooltipContent>Keyboard shortcuts ({modKey}+/)</TooltipContent>
+				</Tooltip>
 
 				<Button
 					variant="ghost"
@@ -564,6 +605,10 @@ export function Workbook({
 							</aside>
 						) : null}
 					</div>
+					<ShortcutsDialog
+						open={shortcutsOpen}
+						onOpenChange={setShortcutsOpen}
+					/>
 				</>
 			) : (
 				<div
