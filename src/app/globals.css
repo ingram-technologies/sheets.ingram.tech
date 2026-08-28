@@ -262,6 +262,23 @@
 	}
 
 	/*
+	 * Chrome strips that carry their own scroll affordance.
+	 *
+	 * Only for the toolbar and the sheet-tab strip (see ScrollStrip), where the
+	 * row is 36–40px tall and a classic scrollbar takes a third of it while
+	 * still reading as a rendering defect. Those strips replace it with an edge
+	 * fade plus a chevron, so the scroll stays both visible and operable — this
+	 * is never a licence to hide a scrollbar on a real scrolling surface.
+	 */
+	.scrollbar-none {
+		scrollbar-width: none;
+	}
+
+	.scrollbar-none::-webkit-scrollbar {
+		display: none;
+	}
+
+	/*
 	 * Spreadsheet chrome is dense and keyboard-first: a visible focus ring is
 	 * the difference between usable and unusable. Base UI primitives ship
 	 * their own `focus-visible` styles; this covers the hand-rolled controls

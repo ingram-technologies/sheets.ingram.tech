@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 import type { WorkbookController } from "./controller";
+import { ScrollStrip } from "./ScrollStrip";
 
 /**
  * Sheet tabs.
@@ -131,11 +132,15 @@ export function SheetTabs({ controller }: { controller: WorkbookController }) {
 				<PlusIcon className="size-4" />
 			</Button>
 
-			<div
+			{/* Same trap the toolbar had: past about six sheets the strip
+			    scrolled with nothing saying so, so the tabs at the end were
+			    unreachable with a mouse and invisible to everyone. */}
+			<ScrollStrip
 				ref={stripRef}
 				role="tablist"
 				aria-label="Sheets"
-				className="flex items-center gap-0.5 overflow-x-auto"
+				className="min-w-0 flex-1"
+				contentClassName="gap-0.5"
 			>
 				{visible.map(({ sheet, index }, position) => {
 					const isSelected = index === selected;
@@ -216,7 +221,7 @@ export function SheetTabs({ controller }: { controller: WorkbookController }) {
 						</div>
 					);
 				})}
-			</div>
+			</ScrollStrip>
 
 			<Dialog
 				open={renaming !== null}

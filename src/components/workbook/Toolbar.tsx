@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import type { WorkbookController } from "./controller";
 import type { Color } from "./ironcalc";
 import { AUTOMATIC_COLOR, SWATCHES } from "./palette";
+import { ScrollStrip } from "./ScrollStrip";
 
 const NUMBER_FORMATS: { label: string; example: string; fmt: string }[] = [
 	{ label: "Automatic", example: "1000.12", fmt: "general" },
@@ -87,14 +88,15 @@ export function Toolbar({ controller }: { controller: WorkbookController }) {
 	};
 
 	return (
-		// overflow-x-auto: the row can't wrap without changing the chrome's
-		// height, so a narrow viewport scrolls it rather than clipping controls
-		// away with no affordance.
-		<div
+		// The row can't wrap without changing the chrome's height, so a narrow
+		// viewport scrolls it — inside a ScrollStrip, which is what tells the
+		// user the rest of the row exists and gives a mouse a way to reach it.
+		<ScrollStrip
 			role="toolbar"
 			aria-label="Formatting"
 			aria-orientation="horizontal"
-			className="flex h-10 shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border bg-background px-2"
+			className="h-10 w-full shrink-0 border-b border-border bg-background px-2"
+			contentClassName="gap-0.5"
 		>
 			<IconButton
 				label="Undo (Ctrl+Z)"
@@ -222,7 +224,7 @@ export function Toolbar({ controller }: { controller: WorkbookController }) {
 					})}
 				</DropdownMenuContent>
 			</DropdownMenu>
-		</div>
+		</ScrollStrip>
 	);
 }
 
