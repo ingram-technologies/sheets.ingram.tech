@@ -24,6 +24,7 @@ import { toast } from "@/components/ui/toaster";
 
 import { WorkbookController } from "./controller";
 import { ensureIronCalc, Model } from "./ironcalc";
+import { AgentPanelResizer, useAgentPanelWidth } from "./AgentPanelResizer";
 import { FileMenu } from "./FileMenu";
 import { FindBar } from "./FindBar";
 import { FormulaBar } from "./FormulaBar";
@@ -101,6 +102,18 @@ export function Workbook({
 	const [editing, setEditing] = useState<EditingState | null>(null);
 	const [name, setName] = useState(initialName);
 	const [chatOpen, setChatOpen] = useState(true);
+	const [panelWidth, setPanelWidth] = useAgentPanelWidth();
+
+	/**
+	 * On a phone the panel overlays the grid rather than sitting beside it, so
+	 * opening the workbook with it up meant landing on a sheet you could not
+	 * see — 320px of panel over a 390px viewport left about one column. Start
+	 * from the same value the server rendered, then close it once on mount if
+	 * the viewport is actually narrow.
+	 */
+	useEffect(() => {
+		if (window.matchMedia("(max-width: 767px)").matches) setChatOpen(false);
+	}, []);
 	/** Null = closed. "replace" opens the find panel with replace expanded. */
 	const [find, setFind] = useState<"find" | "replace" | null>(null);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -593,16 +606,29 @@ export function Workbook({
 						 * from `md` up.
 						 */}
 						{chatOpen ? (
-							<aside
-								id="agent-panel"
-								aria-label="Agent"
-								className="absolute inset-y-0 right-0 z-[var(--z-sticky)] w-80 max-w-[85vw] border-l border-border bg-background md:static md:z-auto md:w-80 md:max-w-none xl:w-96"
-							>
-								<ChatPanel
-									controller={controller}
-									renameDocument={renameDocument}
+							<>
+								<AgentPanelResizer
+									width={panelWidth}
+									onWidth={setPanelWidth}
 								/>
-							</aside>
+								<aside
+									id="agent-panel"
+									aria-label="Agent"
+									// The dragged width applies from `md` up,
+									// where the panel sits beside the grid; below
+									// that it overlays at a fixed share of the
+									// viewport and the handle is hidden.
+									style={{
+										["--agent-panel-w" as string]: `${panelWidth}px`,
+									}}
+									className="absolute inset-y-0 right-0 z-[var(--z-sticky)] w-80 max-w-[85vw] border-l border-border bg-background md:static md:z-auto md:w-[var(--agent-panel-w)] md:max-w-none"
+								>
+									<ChatPanel
+										controller={controller}
+										renameDocument={renameDocument}
+									/>
+								</aside>
+							</>
 						) : null}
 					</div>
 					<ShortcutsDialog
