@@ -14,6 +14,7 @@
 		"lint": "nk lint",
 		"format": "nk format",
 		"check": "nk check",
+		"ci": "nk check && nk type-check && vitest run",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"db:generate": "drizzle-kit generate",
