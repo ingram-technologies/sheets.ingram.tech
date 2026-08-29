@@ -8,7 +8,7 @@ import {
 	KeyRoundIcon,
 	Loader2Icon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -62,13 +62,20 @@ export function SetupWizard({
 	const [current, setCurrent] = useState<InferencePrefs | null>(null);
 
 	// Each time it opens, reset to the top and refresh the shown current key.
-	useEffect(() => {
+	// Adjusted during render off a previous-prop sentinel rather than in an
+	// effect: an effect would paint one frame of the last visit's step and key
+	// before correcting it. `loadInferencePrefs` is a guarded localStorage read
+	// that answers null on the server, and both callers mount this closed, so
+	// the reset only ever runs in the browser.
+	const [wasOpen, setWasOpen] = useState(false);
+	if (open !== wasOpen) {
+		setWasOpen(open);
 		if (open) {
 			setCurrent(loadInferencePrefs());
 			setStep("choose");
 			setApiKey("");
 		}
-	}, [open]);
+	}
 
 	// Dismissing without a configured key means "look around first" — remember
 	// it so the automatic nudge stays quiet (the send-time gate still fires).

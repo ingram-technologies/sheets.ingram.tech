@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { SheetsMark } from "@/components/brand/sheets-mark";
 import { Button } from "@/components/ui/button";
@@ -49,18 +49,27 @@ import { bytesToBase64 } from "@/lib/bytes";
 import { isInferenceConfigured, isInferenceDeferred } from "@/lib/inference-prefs";
 import type { WorkbookMeta } from "@/lib/workbooks";
 
+const subscribeNever = () => () => {};
+
 export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 	const router = useRouter();
 	const [creating, setCreating] = useState(false);
 	const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
 	const [trashOpen, setTrashOpen] = useState(false);
-	const [inferenceOpen, setInferenceOpen] = useState(false);
-
-	// First-run nudge: open the setup once, unless it's already configured or the
-	// user chose to look around first. Deferred to an effect (localStorage read).
-	useEffect(() => {
-		if (!isInferenceConfigured() && !isInferenceDeferred()) setInferenceOpen(true);
-	}, []);
+	// First-run nudge: the setup opens by itself unless inference is already
+	// configured or the user chose to look around first. Both live in
+	// localStorage, which the server cannot read — so the nudge is an external
+	// store (false on the server, the real answer on the client's first render)
+	// rather than an effect that opened the dialog a frame late. Once the user
+	// opens or closes it themselves that choice wins.
+	const [inferenceChoice, setInferenceChoice] = useState<boolean | null>(null);
+	const shouldNudge = useSyncExternalStore(
+		subscribeNever,
+		() => !isInferenceConfigured() && !isInferenceDeferred(),
+		() => false,
+	);
+	const inferenceOpen = inferenceChoice ?? shouldNudge;
+	const setInferenceOpen = setInferenceChoice;
 
 	const createWorkbook = async () => {
 		setCreating(true);

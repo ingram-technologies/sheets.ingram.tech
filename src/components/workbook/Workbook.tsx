@@ -97,8 +97,14 @@ export function Workbook({
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const attempt = useRef(0);
+	/** Latest `saveState` for callbacks that must read it without being
+	 *  re-created — the poller, the unload guard. Mirrored in an effect rather
+	 *  than during render: a render-phase ref write is invisible to React and
+	 *  breaks under a re-render it throws away. */
 	const saveStateRef = useRef<SaveState>("saved");
-	saveStateRef.current = saveState;
+	useEffect(() => {
+		saveStateRef.current = saveState;
+	}, [saveState]);
 	/**
 	 * The workbook version these bytes came from, carried as an ETag. Every
 	 * save is a compare-and-swap against it, because the MCP endpoint can
@@ -154,7 +160,10 @@ export function Workbook({
 	 * it says "failed" and offers a real Retry rather than pretending.
 	 */
 	const save = useCallback(
-		async (isRetry = false) => {
+		// A named function expression, so the retry below can schedule another
+		// attempt without reading `save` while its own declaration is still
+		// being initialised.
+		async function save(isRetry = false): Promise<void> {
 			if (!controller) return;
 			if (retryTimer.current) {
 				clearTimeout(retryTimer.current);
@@ -648,10 +657,14 @@ function WorkbookName({
 	const [value, setValue] = useState(name);
 
 	// Reflect renames that land from elsewhere — the agent's rename_workbook
-	// tool, or a rollback — into the editable field.
-	useEffect(() => {
+	// tool, or a rollback — into the editable field. Adjusted during render off
+	// a previous-prop sentinel; in an effect the field showed the old name for
+	// a frame after every remote rename.
+	const [lastName, setLastName] = useState(name);
+	if (name !== lastName) {
+		setLastName(name);
 		setValue(name);
-	}, [name]);
+	}
 
 	const commit = async () => {
 		const next = value.trim();

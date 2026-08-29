@@ -165,6 +165,19 @@ export function DemoWorkbook() {
 	const frameRef = useRef<HTMLDivElement | null>(null);
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 
+	// Clearing the previous run is a reset, so it happens during render off a
+	// run-id sentinel. From inside the replay effect it painted one frame of the
+	// finished transcript before blanking it, which read as a flash of the old
+	// answer every time Replay was pressed.
+	const runKey = started ? runId : null;
+	const [clearedRun, setClearedRun] = useState<number | null>(null);
+	if (runKey !== clearedRun) {
+		setClearedRun(runKey);
+		setMessages([]);
+		setDone(false);
+		setBusy(false);
+	}
+
 	// Load the engine and start only once the demo scrolls into view — keeps the
 	// wasm off the initial landing paint.
 	useEffect(() => {
@@ -190,9 +203,6 @@ export function DemoWorkbook() {
 		let alive = true;
 		let model: Model | null = null;
 		let ctrl: WorkbookController | null = null;
-		setMessages([]);
-		setDone(false);
-		setBusy(false);
 
 		const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 		const reduced = prefersReducedMotion();

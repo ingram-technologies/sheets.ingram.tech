@@ -51,7 +51,7 @@
 	"devDependencies": {
 		"@electric-sql/pglite": "^0.5.4",
 		"@electric-sql/pglite-socket": "^0.2.7",
-		"@ingram-tech/nk-dev": "^0.10.0",
+		"@ingram-tech/nk-dev": "^0.13.1",
 		"@tailwindcss/postcss": "^4.3.3",
 		"@types/node": "^26.1.2",
 		"@types/pg": "^8.20.3",

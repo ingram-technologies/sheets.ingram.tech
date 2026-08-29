@@ -163,7 +163,12 @@ export function ChatPanel({
 		});
 
 	// Anchor for user-edit bursts: the newest message at the moment of the edit.
-	lastMessageIdRef.current = messages[messages.length - 1]?.id ?? null;
+	// Written in an effect, not during render — a render-phase ref write is
+	// invisible to React and lost on a re-render it discards. The mutation
+	// listener below only reads it from a user event, well after commit.
+	useEffect(() => {
+		lastMessageIdRef.current = messages[messages.length - 1]?.id ?? null;
+	}, [messages]);
 
 	// Record the user's hand: every user-authored mutation lands in the edit
 	// log with its delta echo. Agent mutations are excluded — the transcript

@@ -48,11 +48,22 @@ export function TrashDialog({
 	const [busyId, setBusyId] = useState<string | null>(null);
 	const [confirmId, setConfirmId] = useState<string | null>(null);
 
+	// Clearing the last visit's list is a reset, not synchronisation, so it is
+	// adjusted during render off a previous-prop sentinel. In an effect it
+	// painted one frame of the stale list before blanking it. The fetch that
+	// refills it stays in the effect, where it belongs.
+	const [wasOpen, setWasOpen] = useState(false);
+	if (open !== wasOpen) {
+		setWasOpen(open);
+		if (open) {
+			setItems(null);
+			setConfirmId(null);
+		}
+	}
+
 	useEffect(() => {
 		if (!open) return;
 		let cancelled = false;
-		setItems(null);
-		setConfirmId(null);
 		void (async () => {
 			try {
 				const response = await fetch("/api/workbooks/trash");

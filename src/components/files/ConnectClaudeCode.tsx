@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckIcon, CopyIcon, TerminalIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -25,14 +25,18 @@ import { toast } from "@/components/ui/toaster";
  * The origin is read at runtime rather than hardcoded so the command is
  * correct on a preview deployment and on localhost, not just in production.
  */
+const subscribeNever = () => () => {};
+const getOrigin = () => window.location.origin;
+const getNoOrigin = () => "";
+
 export function ConnectClaudeCode() {
 	const [open, setOpen] = useState(false);
-	const [origin, setOrigin] = useState("");
 	const [copied, setCopied] = useState(false);
-
-	useEffect(() => {
-		setOrigin(window.location.origin);
-	}, []);
+	// The origin is a browser-only value with no server equivalent, so it is
+	// read as an external store rather than painted empty and corrected by an
+	// effect: the server snapshot is "" and the client's first render already
+	// has the real origin. It never changes, so the subscribe is a no-op.
+	const origin = useSyncExternalStore(subscribeNever, getOrigin, getNoOrigin);
 
 	const command = `claude mcp add --transport http sheets ${origin}/api/mcp`;
 

@@ -95,42 +95,50 @@ export function Grid({
 
 	const sheet = controller.selectedSheet();
 	const geometry = controller.sheetGeometry(sheet);
+	// The row/column counts are pulled out as plain numbers: the compiler cannot
+	// see inside the controller, so a `geometry.rows` sitting in a dependency
+	// array reads as a property of an object it believes may be mutated later,
+	// and it gives up on memoizing everything downstream.
+	const { rows: rowCount, cols: colCount } = geometry;
 
-	const draw = useCallback(() => {
-		const canvas = canvasRef.current;
-		const container = containerRef.current;
-		if (!canvas || !container) return;
-		const ctx = canvas.getContext("2d");
-		if (!ctx) return;
-		const dpr = window.devicePixelRatio || 1;
-		const width = container.clientWidth;
-		const height = container.clientHeight;
-		if (canvas.width !== Math.round(width * dpr))
-			canvas.width = Math.round(width * dpr);
-		if (canvas.height !== Math.round(height * dpr)) {
-			canvas.height = Math.round(height * dpr);
-		}
-		const now = performance.now();
-		render(ctx, {
-			controller,
-			sheet: controller.selectedSheet(),
-			viewport: {
-				scrollX: scrollRef.current.x,
-				scrollY: scrollRef.current.y,
-				width,
-				height,
-			},
-			colors: readSheetColors(container),
-			dpr,
-			editing: editing ? { row: editing.row, col: editing.col } : null,
-			now,
-		});
-		// Keep animating while pulses are live.
-		if (controller.activePulses(now).length > 0) {
-			cancelAnimationFrame(rafRef.current);
-			rafRef.current = requestAnimationFrame(draw);
-		}
-	}, [controller, editing]);
+	const draw = useCallback(
+		function draw(): void {
+			const canvas = canvasRef.current;
+			const container = containerRef.current;
+			if (!canvas || !container) return;
+			const ctx = canvas.getContext("2d");
+			if (!ctx) return;
+			const dpr = window.devicePixelRatio || 1;
+			const width = container.clientWidth;
+			const height = container.clientHeight;
+			if (canvas.width !== Math.round(width * dpr))
+				canvas.width = Math.round(width * dpr);
+			if (canvas.height !== Math.round(height * dpr)) {
+				canvas.height = Math.round(height * dpr);
+			}
+			const now = performance.now();
+			render(ctx, {
+				controller,
+				sheet: controller.selectedSheet(),
+				viewport: {
+					scrollX: scrollRef.current.x,
+					scrollY: scrollRef.current.y,
+					width,
+					height,
+				},
+				colors: readSheetColors(container),
+				dpr,
+				editing: editing ? { row: editing.row, col: editing.col } : null,
+				now,
+			});
+			// Keep animating while pulses are live.
+			if (controller.activePulses(now).length > 0) {
+				cancelAnimationFrame(rafRef.current);
+				rafRef.current = requestAnimationFrame(draw);
+			}
+		},
+		[controller, editing],
+	);
 
 	// Redraw on model change, resize, theme flip.
 	useEffect(() => {
@@ -173,12 +181,12 @@ export function Grid({
 		if (nearBottom || nearRight) {
 			controller.extendExtent(
 				controller.selectedSheet(),
-				Math.min(geometry.rows + (nearBottom ? 200 : 0), MAX_ROW),
-				Math.min(geometry.cols + (nearRight ? 10 : 0), MAX_COLUMN),
+				Math.min(rowCount + (nearBottom ? 200 : 0), MAX_ROW),
+				Math.min(colCount + (nearRight ? 10 : 0), MAX_COLUMN),
 			);
 		}
 		draw();
-	}, [controller, draw, geometry.cols, geometry.rows]);
+	}, [controller, draw, colCount, rowCount]);
 
 	// ── coordinate helpers ──
 
@@ -384,21 +392,21 @@ export function Grid({
 			if (hit.zone === "corner") {
 				controller.view((model) => {
 					model.setSelectedCell(1, 1);
-					model.setSelectedRange(1, 1, geometry.rows, geometry.cols);
+					model.setSelectedRange(1, 1, rowCount, colCount);
 				});
 				return;
 			}
 			if (hit.zone === "colHeader") {
 				controller.view((model) => {
 					model.setSelectedCell(1, hit.col);
-					model.setSelectedRange(1, hit.col, geometry.rows, hit.col);
+					model.setSelectedRange(1, hit.col, rowCount, hit.col);
 				});
 				return;
 			}
 			if (hit.zone === "rowHeader") {
 				controller.view((model) => {
 					model.setSelectedCell(hit.row, 1);
-					model.setSelectedRange(hit.row, 1, hit.row, geometry.cols);
+					model.setSelectedRange(hit.row, 1, hit.row, colCount);
 				});
 				return;
 			}
@@ -421,8 +429,8 @@ export function Grid({
 			commitEdit,
 			controller,
 			editing,
-			geometry.cols,
-			geometry.rows,
+			colCount,
+			rowCount,
 			locate,
 			overFillHandle,
 			selectionRange,
@@ -711,7 +719,7 @@ export function Grid({
 				event.preventDefault();
 				controller.view((model) => {
 					model.setSelectedCell(1, 1);
-					model.setSelectedRange(1, 1, geometry.rows, geometry.cols);
+					model.setSelectedRange(1, 1, rowCount, colCount);
 				});
 				return;
 			}
@@ -758,8 +766,8 @@ export function Grid({
 			copySelection,
 			editing,
 			ensureVisible,
-			geometry.cols,
-			geometry.rows,
+			colCount,
+			rowCount,
 			paste,
 			selectionRange,
 			startEditing,
@@ -823,9 +831,16 @@ export function Grid({
 		return [];
 	}, [controller, menu]);
 
-	const totalWidth = (geometry.colOffsets[geometry.cols] ?? 0) + ROW_HEADER_WIDTH;
-	const totalHeight = (geometry.rowOffsets[geometry.rows] ?? 0) + COL_HEADER_HEIGHT;
+	const totalWidth = (geometry.colOffsets[colCount] ?? 0) + ROW_HEADER_WIDTH;
+	const totalHeight = (geometry.rowOffsets[rowCount] ?? 0) + COL_HEADER_HEIGHT;
 
+	// The scroll offset deliberately lives outside React: the canvas redraws
+	// from it on every scroll frame, and putting it in state would re-render
+	// the whole grid at 60fps. The cell editor is a DOM overlay, so its
+	// position has to be computed at render from that same offset, and there is
+	// no React-visible copy to read instead. Editing always begins from an
+	// event, after the ref is current.
+	/* oxlint-disable react/refs -- scroll offset is intentionally ref-held; see above */
 	const editorRect = editing
 		? cellRect(controller, sheet, editing.row, editing.col, {
 				scrollX: scrollRef.current.x,
@@ -834,6 +849,7 @@ export function Grid({
 				height: 0,
 			})
 		: null;
+	/* oxlint-enable react/refs */
 
 	return (
 		<div

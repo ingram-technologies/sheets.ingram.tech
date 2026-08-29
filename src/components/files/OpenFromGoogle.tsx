@@ -63,7 +63,7 @@ export function OpenFromGoogle() {
 	const [open, setOpen] = useState(false);
 	const [query, setQuery] = useState("");
 	const [results, setResults] = useState<Listing[] | null>(null);
-	const [searching, setSearching] = useState(false);
+	const [settledQuery, setSettledQuery] = useState<string | null>(null);
 	const [scopeMissing, setScopeMissing] = useState(false);
 	const [importing, setImporting] = useState(false);
 	const [browsing, setBrowsing] = useState(false);
@@ -71,13 +71,19 @@ export function OpenFromGoogle() {
 	const linkedId = parseSpreadsheetRef(query);
 	const picker = pickerConfig();
 
+	// A search is outstanding whenever the query the effect would fetch is not
+	// the one it last finished. Derived rather than set from inside the effect,
+	// so the very first render of a new query already reads as busy instead of
+	// painting an idle frame and correcting it.
+	const pendingQuery = open && !linkedId ? query : null;
+	const searching = pendingQuery !== null && pendingQuery !== settledQuery;
+
 	// Debounced search; an empty query lists the most recent spreadsheets.
 	// Skipped while the input holds a pasted link — that's an import, not a
 	// search.
 	useEffect(() => {
 		if (!open || linkedId) return;
 		let cancelled = false;
-		setSearching(true);
 		const timer = setTimeout(() => {
 			void (async () => {
 				try {
@@ -96,7 +102,7 @@ export function OpenFromGoogle() {
 				} catch {
 					if (!cancelled) setResults(null);
 				} finally {
-					if (!cancelled) setSearching(false);
+					if (!cancelled) setSettledQuery(query);
 				}
 			})();
 		}, 250);
@@ -178,6 +184,7 @@ export function OpenFromGoogle() {
 
 	const reset = () => {
 		setQuery("");
+		setSettledQuery(null);
 		setResults(null);
 		setScopeMissing(false);
 		setImporting(false);

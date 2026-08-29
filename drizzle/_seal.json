@@ -1,0 +1,14 @@
+{
+	"$comment": "sha256 of each migration file at the time it was sealed. Applied migrations are immutable: if a hash here stops matching, the file was edited after it ran and every database that already applied it has drifted. Regenerate with `nk migrations --reseal` ONLY as part of a deliberate squash.",
+	"migrations": {
+		"0000_workbooks": "9277033fb169df6666e684af61cc032bb436c292fb487b8d9c4b690be98e3178",
+		"0001_better_auth": "42490ee6492cbf7f07c8c40ee99a77ec232941b6fa3c3afbf5c3c63ed4fe597c",
+		"0002_workbook_uuid_ids": "53d8cca07cb2869d8774eb1675afec4c905e2d76f04d31a22e2401349fd65fef",
+		"0003_google_spreadsheet_link": "52d0073ca216c5d3527cf0bf9bfa22923113a1548fa2aff127401d8def4ded37",
+		"0004_workbook_owner": "158b114318e7e5979c8c1a68d6b1f697e16d484f2b938ecf0732a35289b3c3af",
+		"0005_workbook_soft_delete": "a6bf094db55c2b2248d4d82c3705a0962ae84affa94c79fff95aadae62caa5b4",
+		"0006_workbook_version": "6b8e35e65a3bd1e0fe8be9bc13b7de12f5c7e122cd3ccf70770023ce24fd3788",
+		"0007_workbook_last_activity": "141ffd2735576895334b3503e8081f47de35a7733ebe5254ca77e8a1be02f58e",
+		"0008_mcp_oauth": "f4ca5143601bc3bc34d7258dad1faf773be5cfe584aa487dcff99362b3e35bc4"
+	}
+}
