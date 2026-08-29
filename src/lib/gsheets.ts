@@ -2,9 +2,9 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth";
 import {
+	DRIVE_FILE_SCOPE,
 	GOOGLE_SCOPE_MISSING,
 	MAX_SNAPSHOT_CELLS,
-	SPREADSHEETS_SCOPE,
 	type SnapshotCell,
 	type WorkbookSnapshot,
 } from "@/lib/gsheets-transfer";
@@ -68,10 +68,16 @@ export function gsheetsErrorResponse(error: unknown): Response {
 /**
  * Access token for the user's Google account, refreshed by Better Auth.
  * Throws `no_scope` unless every scope in `required` was granted.
+ *
+ * The default requires only `drive.file`: the Sheets API honours it for
+ * spreadsheets this app created or the user picked, and for anything else
+ * Google answers 403 insufficient-scope, which `googleFetch` turns into the
+ * same `no_scope` — so the on-demand `spreadsheets` consent is driven by
+ * Google's verdict per file, never demanded up front.
  */
 export async function getGoogleToken(
 	userId: string,
-	required: string[] = [SPREADSHEETS_SCOPE],
+	required: string[] = [DRIVE_FILE_SCOPE],
 ): Promise<{ accessToken: string; scopes: string[] }> {
 	let accessToken: string;
 	let scopes: string[];

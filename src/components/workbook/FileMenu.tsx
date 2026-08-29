@@ -27,7 +27,11 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/components/ui/toaster";
-import { isScopeMissing, requestSpreadsheetsAccess } from "@/lib/google-access";
+import {
+	isScopeMissing,
+	requestSpreadsheetsAccess,
+	SPREADSHEETS_ACCESS_EXPLAINER,
+} from "@/lib/google-access";
 import { spreadsheetUrl } from "@/lib/gsheets-transfer";
 
 import type { WorkbookController } from "./controller";
@@ -64,9 +68,9 @@ export function FileMenu({
 			const body: unknown = await response.json();
 			if (!response.ok) {
 				if (isScopeMissing(body)) {
-					toast("Sheets needs access to your Google Sheets", {
-						description:
-							"Google asked for this permission separately at sign-in.",
+					toast("Sheets needs access to this Google Sheet", {
+						description: SPREADSHEETS_ACCESS_EXPLAINER,
+						duration: 15_000,
 						action: {
 							label: "Grant access",
 							onClick: () =>

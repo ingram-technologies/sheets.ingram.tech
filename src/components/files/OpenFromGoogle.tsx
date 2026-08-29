@@ -25,7 +25,11 @@ import { toast } from "@/components/ui/toaster";
 import { ensureIronCalc } from "@/components/workbook/ironcalc";
 import { modelFromSnapshot } from "@/components/workbook/google-snapshot";
 import { bytesToBase64 } from "@/lib/bytes";
-import { isScopeMissing, requestSpreadsheetsAccess } from "@/lib/google-access";
+import {
+	isScopeMissing,
+	requestSpreadsheetsAccess,
+	SPREADSHEETS_ACCESS_EXPLAINER,
+} from "@/lib/google-access";
 import { pickerConfig, pickSpreadsheet } from "@/lib/google-picker";
 import { parseSpreadsheetRef, snapshotSchema } from "@/lib/gsheets-transfer";
 
@@ -351,8 +355,7 @@ function ScopePrompt() {
 	return (
 		<div className="flex flex-col items-center gap-3 px-6 py-8 text-center">
 			<p className="text-sm text-muted-foreground">
-				Sheets needs access to your Google Sheets — Google asked for this
-				permission separately at sign-in.
+				{SPREADSHEETS_ACCESS_EXPLAINER}
 			</p>
 			<Button size="sm" onClick={() => void requestSpreadsheetsAccess("/")}>
 				Grant access with Google

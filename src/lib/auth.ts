@@ -3,17 +3,22 @@ import { betterAuth } from "better-auth";
 import { mcp } from "better-auth/plugins";
 
 import { pool } from "@/lib/db";
-import { DRIVE_FILE_SCOPE, SPREADSHEETS_SCOPE } from "@/lib/gsheets-transfer";
+import { DRIVE_FILE_SCOPE } from "@/lib/gsheets-transfer";
 
 /**
  * Google-only sign-in via the shared Ingram Google OAuth client (the same
  * client that backs ingram-cloud's console — its authorized redirect URIs
  * list includes https://sheets.ingram.tech/auth/callback/google).
  *
- * The Sheets scopes are requested at sign-in but OPTIONAL: Google's
- * granular-consent screen presents them as checkboxes the user can leave
- * unticked and still complete login (the Google Sheets bridge then prompts
- * for incremental consent when used). The provider always sends
+ * Sign-in asks only for the NON-sensitive `drive.file` scope (plus the
+ * identity scopes). The sensitive `spreadsheets` scope is deliberately NOT
+ * requested here: the shared OAuth client is unverified, and any sensitive
+ * scope in the sign-in request puts Google's "hasn't verified this app"
+ * interstitial in front of every new user. `drive.file` alone covers the
+ * bridge for spreadsheets this app created or the user picked via the
+ * Picker; opening a foreign sheet by URL is the one case that needs
+ * `spreadsheets`, requested on demand via `requestSpreadsheetsAccess`
+ * (`src/lib/google-access.ts`). The provider always sends
  * `include_granted_scopes`, so a later grant keeps earlier ones.
  * `accessType: "offline"` stores a refresh token in the `account` table for
  * the server-side Sheets API calls.
@@ -28,7 +33,7 @@ export const auth = betterAuth({
 		google: {
 			clientId: process.env.GOOGLE_CLIENT_ID ?? "",
 			clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-			scope: [SPREADSHEETS_SCOPE, DRIVE_FILE_SCOPE],
+			scope: [DRIVE_FILE_SCOPE],
 			accessType: "offline",
 		},
 	},

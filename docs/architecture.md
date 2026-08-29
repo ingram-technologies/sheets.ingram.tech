@@ -292,21 +292,32 @@ The split follows the engine split: the browser builds/consumes a neutral
 snapshot — values, formulas, number formats (`src/lib/gsheets-transfer.ts`
 schema, `src/components/workbook/google-snapshot.ts` builder) — and the server
 (`src/lib/gsheets.ts`) exchanges it with the Sheets v4 API using the OAuth token
-from Better Auth's `account` table (`auth.api.getAccessToken` refreshes it). If
-the user declined the optional spreadsheets scope at sign-in, routes answer
-`google_scope_missing` and the client offers incremental consent via
-`linkSocial`. Full-Drive *listing* scopes are restricted (heavy verification for
-the shared OAuth client), which is why browse goes through the Picker +
-non-sensitive `drive.file` instead. Richer style transfer is a follow-up.
+from Better Auth's `account` table (`auth.api.getAccessToken` refreshes it).
+
+Scopes are chosen around Google's verification tiers, because the shared OAuth
+client is unverified and any *sensitive* scope in the sign-in request puts the
+"Google hasn't verified this app" interstitial in front of every new user:
+
+- Sign-in requests only the non-sensitive `drive.file`. The Sheets API honours
+  it for spreadsheets this app created or the user picked via the Picker, so
+  save / open / search all work with no extra grant.
+- The sensitive `spreadsheets` scope is never requested at sign-in. Opening a
+  foreign sheet by pasted URL is the one case that needs it: Google answers
+  403 insufficient-scope, the route maps that to `google_scope_missing`, and
+  the client offers on-demand consent via `linkSocial` — after telling the user
+  to expect the unverified-app warning (`SPREADSHEETS_ACCESS_EXPLAINER`).
+- Full-Drive *listing* scopes are restricted (heavy verification), which is
+  why browse-all goes through the Picker instead.
+
+Richer style transfer is a follow-up.
 
 ## What is deliberately NOT here yet
 
 - **Sharing / membership** — workbooks now have exactly one owner (see
   "Ownership" below), so there is no *sharing*: no membership table, no roles,
   no per-range ACL. A workbook is reachable by its owner or by nobody.
-  Sign-in also (optionally, via Google's granular consent) requests the
-  `spreadsheets` scope and stores a refresh token in the `account` table — the
-  Google Sheets bridge runs on it.
+  Sign-in also requests the non-sensitive `drive.file` scope and stores a
+  refresh token in the `account` table — the Google Sheets bridge runs on it.
 - **sheetd + realtime channel** — no live channel; a tab learns about outside
   edits by polling, and the engine diff queue
   (`flushSendQueue`/`applyExternalDiffs`) is carried unused until then. Two

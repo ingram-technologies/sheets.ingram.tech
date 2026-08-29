@@ -18,9 +18,19 @@ export function isScopeMissing(body: unknown): boolean {
 }
 
 /**
- * Send the user through Google's incremental-consent flow for the Sheets
- * scopes (they declined the optional checkboxes at sign-in, or granted only
- * one of the pair). Navigates away; on return they land on `callbackPath`.
+ * Copy shown before sending the user to on-demand `spreadsheets` consent.
+ * That scope is sensitive and the shared OAuth client is unverified, so
+ * Google shows a "hasn't verified this app" page first — warn about it here
+ * so the interstitial reads as expected rather than alarming.
+ */
+export const SPREADSHEETS_ACCESS_EXPLAINER =
+	"This spreadsheet wasn't created or picked through Sheets, so Google needs a separate permission for it. Google will show a \"hasn't verified this app\" warning — choose Advanced, then Continue.";
+
+/**
+ * Send the user through Google's incremental-consent flow for the sensitive
+ * `spreadsheets` scope (never requested at sign-in — see `src/lib/auth.ts`),
+ * plus `drive.file` in case that was declined too. Navigates away; on return
+ * they land on `callbackPath`.
  */
 export async function requestSpreadsheetsAccess(callbackPath: string): Promise<void> {
 	await authClient.linkSocial({
