@@ -26,7 +26,7 @@
 		"@ai-sdk/react": "^4.0.54",
 		"@base-ui/react": "^1.7.0",
 		"@better-auth/passkey": "~1.6.30",
-		"@ingram-cloud/ai-sdk": "^2.0.0",
+		"@ingram-cloud/ai-sdk": "^3.0.0",
 		"@ingram-cloud/sdk": "^1.4.0",
 		"@ingram-tech/nk-auth": "^0.14.1",
 		"@ingram-tech/nk-db": "^2.1.1",
