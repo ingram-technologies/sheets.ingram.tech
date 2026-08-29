@@ -10,9 +10,10 @@ import { createIdColumns } from "@ingram-tech/nk-db/id/drizzle";
 export const ids = createIdRegistry({ workbook: "wb" });
 
 /**
- * `idColumn("workbook")` types the uuid column in schema.ts so a skinned
- * `wb_…` id reaching a typed query is decoded in `toDriver` instead of
- * blowing up as `invalid input syntax for type uuid`. TypeScript-only:
- * `dataType` stays `uuid`, no DDL, no migration.
+ * `idColumn("workbook")` types the uuid column in schema.ts and is the *only*
+ * place the codec runs: it decodes a skinned `wb_…` id on the way into a query
+ * and encodes the stored uuid on the way out, so application code never sees a
+ * raw uuid and never converts by hand. TypeScript-only: `dataType` stays
+ * `uuid`, no DDL, no migration.
  */
 export const { idColumn } = createIdColumns(ids);

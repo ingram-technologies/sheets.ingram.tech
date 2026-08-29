@@ -34,12 +34,12 @@ const metaColumns = {
 	deletedAt: schema.workbooks.deletedAt,
 };
 
-// The id codec lives at this boundary: rows carry UUIDv7, everything returned
-// or accepted here uses the public `wb_…` skin. The explicit decodeOrNull
-// gates are validation, not translation — a malformed/mismatched public id
-// behaves exactly like a missing row (404, not a Postgres type error). The
-// schema's idColumn additionally decodes any skinned id that reaches a typed
-// query, so a missed decode elsewhere can no longer 500.
+// No id conversion happens here. The schema's `idColumn` is the whole codec
+// boundary: it decodes a public `wb_…` id on the way into a query and encodes
+// the stored uuid on the way out, so a selected `id` is already skinned. What
+// is left is validation — `ids.workbook.is` rejects a malformed or foreign id
+// so it behaves exactly like a missing row (404, not a Postgres type error)
+// instead of reaching the database at all.
 function toMeta(row: {
 	id: string;
 	name: string;
@@ -52,7 +52,7 @@ function toMeta(row: {
 	deletedAt: Date | null;
 }): WorkbookMeta {
 	return {
-		id: ids.workbook.encode(row.id),
+		id: row.id,
 		name: row.name,
 		size: row.size,
 		version: row.version,
@@ -74,9 +74,9 @@ function toMeta(row: {
  * forbidden — a 403 would confirm the id exists, which is itself a leak given
  * ids are enumerable-ish. Callers turn null into a 404.
  */
-function owned(uuid: string, userId: string) {
+function owned(id: string, userId: string) {
 	return and(
-		eq(schema.workbooks.id, uuid),
+		eq(schema.workbooks.id, id),
 		eq(schema.workbooks.userId, userId),
 		// Live rows only: a trashed workbook is treated as missing by every
 		// read/write. Trash-specific queries below opt back in explicitly.
@@ -117,12 +117,11 @@ export async function getWorkbookMeta(
 	id: string,
 	userId: string,
 ): Promise<WorkbookMeta | null> {
-	const uuid = ids.workbook.decodeOrNull(id);
-	if (!uuid) return null;
+	if (!ids.workbook.is(id)) return null;
 	const rows = await db
 		.select(metaColumns)
 		.from(schema.workbooks)
-		.where(owned(uuid, userId));
+		.where(owned(id, userId));
 	const row = rows[0];
 	return row ? toMeta(row) : null;
 }
@@ -145,12 +144,11 @@ export async function linkGoogleSpreadsheet(
 	userId: string,
 	googleSpreadsheetId: string,
 ): Promise<boolean> {
-	const uuid = ids.workbook.decodeOrNull(id);
-	if (!uuid) return false;
+	if (!ids.workbook.is(id)) return false;
 	const rows = await db
 		.update(schema.workbooks)
 		.set({ googleSpreadsheetId })
-		.where(owned(uuid, userId))
+		.where(owned(id, userId))
 		.returning({ id: schema.workbooks.id });
 	return rows.length > 0;
 }
@@ -165,12 +163,11 @@ export async function getWorkbookForEdit(
 	id: string,
 	userId: string,
 ): Promise<{ bytes: Uint8Array; meta: WorkbookMeta } | null> {
-	const uuid = ids.workbook.decodeOrNull(id);
-	if (!uuid) return null;
+	if (!ids.workbook.is(id)) return null;
 	const rows = await db
 		.select({ ...metaColumns, bytes: schema.workbooks.bytes })
 		.from(schema.workbooks)
-		.where(owned(uuid, userId));
+		.where(owned(id, userId));
 	const row = rows[0];
 	if (!row) return null;
 	const { bytes, ...meta } = row;
@@ -202,8 +199,7 @@ export async function saveWorkbookBytes(
 	 *  by the browser's own autosave, which has nothing to announce. */
 	activity?: Omit<WorkbookActivity, "version">,
 ): Promise<SaveResult> {
-	const uuid = ids.workbook.decodeOrNull(id);
-	if (!uuid) return { ok: false, reason: "not_found" };
+	if (!ids.workbook.is(id)) return { ok: false, reason: "not_found" };
 	const rows = await db
 		.update(schema.workbooks)
 		.set({
@@ -216,7 +212,7 @@ export async function saveWorkbookBytes(
 				? { lastActivity: { ...activity, version: expectedVersion + 1 } }
 				: {}),
 		})
-		.where(and(owned(uuid, userId), eq(schema.workbooks.version, expectedVersion)))
+		.where(and(owned(id, userId), eq(schema.workbooks.version, expectedVersion)))
 		.returning(metaColumns);
 	const row = rows[0];
 	if (row) return { ok: true, meta: toMeta(row) };
@@ -235,12 +231,11 @@ export async function renameWorkbook(
 	userId: string,
 	name: string,
 ): Promise<WorkbookMeta | null> {
-	const uuid = ids.workbook.decodeOrNull(id);
-	if (!uuid) return null;
+	if (!ids.workbook.is(id)) return null;
 	const rows = await db
 		.update(schema.workbooks)
 		.set({ name, updatedAt: new Date() })
-		.where(owned(uuid, userId))
+		.where(owned(id, userId))
 		.returning(metaColumns);
 	const row = rows[0];
 	return row ? toMeta(row) : null;
@@ -248,26 +243,24 @@ export async function renameWorkbook(
 
 /** Move a live workbook to the trash (recoverable). */
 export async function trashWorkbook(id: string, userId: string): Promise<boolean> {
-	const uuid = ids.workbook.decodeOrNull(id);
-	if (!uuid) return false;
+	if (!ids.workbook.is(id)) return false;
 	const rows = await db
 		.update(schema.workbooks)
 		.set({ deletedAt: new Date() })
-		.where(owned(uuid, userId))
+		.where(owned(id, userId))
 		.returning({ id: schema.workbooks.id });
 	return rows.length > 0;
 }
 
 /** Restore a trashed workbook back to the live list. */
 export async function restoreWorkbook(id: string, userId: string): Promise<boolean> {
-	const uuid = ids.workbook.decodeOrNull(id);
-	if (!uuid) return false;
+	if (!ids.workbook.is(id)) return false;
 	const rows = await db
 		.update(schema.workbooks)
 		.set({ deletedAt: null })
 		.where(
 			and(
-				eq(schema.workbooks.id, uuid),
+				eq(schema.workbooks.id, id),
 				eq(schema.workbooks.userId, userId),
 				isNotNull(schema.workbooks.deletedAt),
 			),
@@ -282,13 +275,12 @@ export async function deleteWorkbookPermanently(
 	id: string,
 	userId: string,
 ): Promise<boolean> {
-	const uuid = ids.workbook.decodeOrNull(id);
-	if (!uuid) return false;
+	if (!ids.workbook.is(id)) return false;
 	const rows = await db
 		.delete(schema.workbooks)
 		.where(
 			and(
-				eq(schema.workbooks.id, uuid),
+				eq(schema.workbooks.id, id),
 				eq(schema.workbooks.userId, userId),
 				isNotNull(schema.workbooks.deletedAt),
 			),
