@@ -58,6 +58,7 @@ export function SetupWizard({
 	const [step, setStep] = useState<Step>("choose");
 	const [provider, setProvider] = useState<InferenceProvider>("anthropic");
 	const [apiKey, setApiKey] = useState("");
+	const [workspaceId, setWorkspaceId] = useState("");
 	const [saving, setSaving] = useState(false);
 	const [current, setCurrent] = useState<InferencePrefs | null>(null);
 
@@ -74,6 +75,7 @@ export function SetupWizard({
 			setCurrent(loadInferencePrefs());
 			setStep("choose");
 			setApiKey("");
+			setWorkspaceId("");
 		}
 	}
 
@@ -98,7 +100,13 @@ export function SetupWizard({
 			const response = await fetch("/api/inference/byok", {
 				method: "POST",
 				headers: { "content-type": "application/json" },
-				body: JSON.stringify({ provider, apiKey: trimmed }),
+				body: JSON.stringify({
+					provider,
+					apiKey: trimmed,
+					...(provider === "anthropic" && workspaceId.trim()
+						? { workspaceId: workspaceId.trim() }
+						: {}),
+				}),
 			});
 			if (!response.ok) {
 				toast.error(
@@ -115,6 +123,7 @@ export function SetupWizard({
 				configuredAt: new Date().toISOString(),
 			});
 			setApiKey("");
+			setWorkspaceId("");
 			toast.success("Key attached — your agent now bills to your own account.");
 			onOpenChange(false);
 		} catch {
@@ -273,6 +282,32 @@ export function SetupWizard({
 									className="font-mono"
 								/>
 							</label>
+
+							{provider === "anthropic" ? (
+								<label className="block space-y-1.5">
+									<span className="text-xs font-medium text-muted-foreground">
+										Workspace ID{" "}
+										<span className="font-normal">(optional)</span>
+									</span>
+									<Input
+										autoComplete="off"
+										spellCheck={false}
+										value={workspaceId}
+										onChange={(event) =>
+											setWorkspaceId(event.target.value)
+										}
+										placeholder="wrkspc_…"
+										className="font-mono"
+									/>
+									<span className="block text-xs text-muted-foreground">
+										Only for keys whose scope is “Same as linked
+										account” — Anthropic needs to know which
+										workspace to bill. Find it under Settings →
+										Workspaces. Keys scoped to a single workspace
+										can leave this empty.
+									</span>
+								</label>
+							) : null}
 						</div>
 
 						<div className="flex items-center justify-between">

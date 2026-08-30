@@ -9,7 +9,7 @@
         "@base-ui/react": "^1.7.0",
         "@better-auth/passkey": "~1.6.30",
         "@ingram-cloud/ai-sdk": "^3.0.0",
-        "@ingram-cloud/sdk": "^1.4.0",
+        "@ingram-cloud/sdk": "^1.10.0",
         "@ingram-tech/nk-auth": "^0.14.1",
         "@ingram-tech/nk-db": "^2.1.1",
         "@ironcalc/wasm": "file:vendor/ironcalc-wasm",
@@ -282,7 +282,7 @@
 
     "@ingram-cloud/ai-sdk": ["@ingram-cloud/ai-sdk@3.0.0", "", { "dependencies": { "@ai-sdk/openai": "^4.0.41", "@ai-sdk/provider": "^4.0.0" }, "peerDependencies": { "ai": "^7.0.0" } }, "sha512-mIPA+IgfgmgZBiVuqphR3OOBHzNej6qlMXhFzbOZClgZFc5FXje20fat98Qhbi3nK+omQn/zi0a/NgOUu+rT+A=="],
 
-    "@ingram-cloud/sdk": ["@ingram-cloud/sdk@1.7.0", "", { "dependencies": { "zod": "^4.4.3" } }, "sha512-BXNHxTntLt1tWPHrTRZvYfxYA1624rFKwcitzSWvbT2D+jmG0XugdHGt6mvmtE4fm6IVGamhNsurkp9hRn7QFw=="],
+    "@ingram-cloud/sdk": ["@ingram-cloud/sdk@1.10.0", "", { "dependencies": { "zod": "^4.4.3" } }, "sha512-wrCqPNXPesDWzKpRs3Is4Sv/0cx/g2aXFKVwoME9LmiBfwTTLTWcEPt6GnWtN0EStMiMiL3EFSNiandZ+OsU+w=="],
 
     "@ingram-tech/nk-auth": ["@ingram-tech/nk-auth@0.14.1", "", { "dependencies": { "@ingram-tech/nk-db": "^2.1.1", "bcrypt": "^6.0.0", "jose": "^6.2.9", "zod": "^4.4.3" }, "peerDependencies": { "@better-auth/passkey": "^1.6.15", "better-auth": "^1.6.15", "next": "^15.0.0 || ^16.0.0", "pg": "^8.13.0", "react": "^18.0.0 || ^19.0.0" }, "optionalPeers": ["@better-auth/passkey", "next", "pg", "react"] }, "sha512-eNYuVkCH9MbRzEi04zIWZCNud5kFdJNjMRycYiMYJ8zO3opFPrfay/PDt9MwTf+5K0ylPej4BVAGCj92/uhtew=="],
 

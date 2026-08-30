@@ -62,16 +62,24 @@ export async function resolveUserSmith(userId: string): Promise<ICSmith> {
  * The key is handed straight to Ingram Cloud and never persisted by us. A key
  * that is present but rejected surfaces as the provider's auth error on the
  * user's next run — IC deliberately does NOT fall back to the tenant key.
+ *
+ * `workspaceId` is Anthropic's `anthropic-workspace-id`: an identity-linked
+ * ("Same as linked account") Claude key spans every workspace the person can
+ * reach, so Anthropic rejects its requests until one is named. IC sends it as
+ * the header on that smith's runs (cloud.ingram.tech#267). Workspace-scoped
+ * keys don't need it, and other providers ignore it.
  */
 export async function setUserProviderKey(args: {
 	userId: string;
 	provider: InferenceProvider;
 	apiKey: string;
+	workspaceId?: string;
 }): Promise<{ smithId: string }> {
 	const ic = client();
 	const smith = await resolveUserSmith(args.userId);
 	await ic.smiths.modelKeys.put(smith.id, args.provider, {
 		api_key: args.apiKey,
+		workspace_id: args.workspaceId ?? null,
 	});
 	return { smithId: smith.id };
 }

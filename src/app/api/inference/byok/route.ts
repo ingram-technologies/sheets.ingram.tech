@@ -14,6 +14,9 @@ import { requireApiUser } from "@/lib/session";
 const putSchema = z.object({
 	provider: z.enum(INFERENCE_PROVIDERS),
 	apiKey: z.string().min(20).max(400),
+	// Anthropic's workspace id (`wrkspc_…`) — only needed for identity-linked
+	// keys; see `setUserProviderKey`.
+	workspaceId: z.string().trim().min(1).max(200).optional(),
 });
 
 const deleteSchema = z.object({ provider: z.enum(INFERENCE_PROVIDERS) });
@@ -32,6 +35,7 @@ export async function POST(request: Request) {
 			userId: gate.userId,
 			provider: parsed.data.provider,
 			apiKey: parsed.data.apiKey,
+			workspaceId: parsed.data.workspaceId,
 		});
 		return Response.json({
 			status: "active",
