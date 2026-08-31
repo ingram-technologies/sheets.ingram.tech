@@ -48,6 +48,7 @@ import { useInference } from "@/components/inference/useInference";
 import { ensureIronCalc, Model } from "@/components/workbook/ironcalc";
 import { bytesToBase64 } from "@/lib/bytes";
 import { type InferenceView, isInferenceDeferred } from "@/lib/inference-client";
+import { agentMode } from "@/lib/webmcp";
 import type { WorkbookMeta } from "@/lib/workbooks";
 
 const subscribeNever = () => () => {};
@@ -77,7 +78,12 @@ export function FileManager({
 		isInferenceDeferred,
 		() => false,
 	);
-	const inferenceOpen = inferenceChoice ?? (view?.credential === null && !deferred);
+	// Having chosen the browser's own agent is an answer to the same question,
+	// so it silences the nudge exactly as a linked credential does.
+	const mode = useSyncExternalStore(subscribeNever, agentMode, () => null);
+	const inferenceOpen =
+		inferenceChoice ??
+		(view?.credential === null && !deferred && mode !== "webmcp");
 	const setInferenceOpen = setInferenceChoice;
 
 	const createWorkbook = async () => {

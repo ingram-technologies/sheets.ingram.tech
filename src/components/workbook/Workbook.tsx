@@ -23,6 +23,7 @@ import { FormulaBar } from "./FormulaBar";
 import type { EditingState } from "./Grid";
 import { Grid } from "./Grid";
 import { SheetTabs } from "./SheetTabs";
+import { useWebMcpTools } from "./useWebMcpTools";
 import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
 
@@ -375,6 +376,10 @@ export function Workbook({
 		},
 		[id, name],
 	);
+
+	// Offer the workbook's tools to an agent driving the browser (WebMCP).
+	// No-op where the browser has no model context.
+	useWebMcpTools(controller, renameDocument);
 
 	// Debounced autosave on every content mutation.
 	useEffect(() => {

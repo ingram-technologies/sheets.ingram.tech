@@ -21,6 +21,15 @@ export const metadata: Metadata = {
 	description: "AI-native spreadsheets",
 };
 
+/**
+ * WebMCP ships to real users only under an origin trial (Chrome 149-156) until
+ * it lands by default. The token is registered per origin at
+ * chrome.com/origintrials; without it `document.modelContext` is absent for
+ * everyone but developers running with --enable-webmcp-testing, and the tools
+ * in `src/lib/webmcp.ts` are simply never offered.
+ */
+const webMcpTrialToken = process.env.NEXT_PUBLIC_WEBMCP_ORIGIN_TRIAL;
+
 export const viewport: Viewport = {
 	// Charcoal base — stops mobile browser chrome flashing white against a
 	// dark-first surface.
@@ -31,6 +40,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
 	return (
 		<html lang="en" className="dark">
+			{webMcpTrialToken ? (
+				<head>
+					<meta httpEquiv="origin-trial" content={webMcpTrialToken} />
+				</head>
+			) : null}
 			<body
 				className={`${inter.variable} bg-background font-sans text-foreground antialiased`}
 			>

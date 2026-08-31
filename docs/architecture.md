@@ -264,6 +264,56 @@ resolves `X-IC-Smith-External-Id → workbook`, and the chat panel renders IC ru
 streams. The tool surface deliberately mirrors the sheetkit MCP DSL verbs so
 that swap is a transport change, not a redesign.
 
+## The browser's agent (WebMCP)
+
+The third transport onto the same tool surface, after `/api/chat` and
+`/api/mcp` — and the only one where Sheets supplies no model at all.
+
+- The page publishes its tools to whatever agent is driving the browser
+  (ChatGPT desktop's built-in browser, Chrome). The model runs on their side and
+  bills to their subscription; Sheets contributes the tools and executes them
+  locally in the tab.
+- **It is an origin trial, Chrome 149-156**, not a shipped API. Real users need
+  the token in `NEXT_PUBLIC_WEBMCP_ORIGIN_TRIAL` (rendered as the `origin-trial`
+  meta tag in `app/layout.tsx`); local development needs
+  `chrome://flags/#enable-webmcp-testing`. Without either,
+  `document.modelContext` is absent and the tools are simply never offered.
+- `src/lib/webmcp.ts` is the whole seam, verified against Chrome 152. The entry
+  point is `document.modelContext`; the original `navigator.modelContext` is
+  gone, and there is no set-at-a-time `provideContext` — tools go over
+  `registerTool` one by one, torn down by aborting a shared signal (which does
+  work on 152, despite the docs dating it to 153). Registration rejects on a
+  duplicate name, so a failure is logged rather than left as an unhandled
+  rejection: a page that quietly offers no tools is indistinguishable from an
+  agent that ignored it.
+- **The host stringifies whatever `execute` returns**, so a tool answers with
+  the executor's text verbatim. Wrapping it in MCP `content` blocks reaches the
+  agent as JSON noise around the grid.
+- Schemas are emitted in **input mode** (`z.toJSONSchema(…, { io: "input" })`)
+  so a field carrying a default reads as optional. Output mode marks it
+  required, which would make the agent supply `what` and `count` by hand. The
+  `/api/mcp` surface still emits output mode and has the same quirk.
+- Tools carry `annotations`: `readOnlyHint` on the three that change nothing, so
+  the host can run them unattended, and `untrustedContentHint` on the two that
+  return cell contents — a cell can hold anything, including text shaped like an
+  instruction.
+- `useWebMcpTools` (`src/components/workbook/`) registers for as long as a
+  workbook is open, mapping `agentToolSchemas` through `z.toJSONSchema` and
+  running calls through an `AgentExecutor` on the same `WorkbookController`.
+  So a visiting agent gets the presence choreography and the delta echo, and
+  its writes ride autosave's compare-and-swap like any keystroke.
+- Registration is **unconditional wherever the browser supports it**: tools are
+  a property of the page, not a preference. What the user picks in the setup
+  dialog (`agentMode`, localStorage) only decides whether onboarding keeps
+  asking them to link Ingram Cloud.
+- A visiting agent arrives cold — no system prompt, no injected workbook
+  sketch, only the descriptors. `get_workbook_overview` therefore carries a
+  different description here than the in-app agent sees; the A1 and sheet-name
+  conventions ride in the Zod field descriptions either way.
+- **This does not remove the sign-in.** Workbooks are per-owner, so the agent
+  works inside the user's existing session. It removes only the *inference*
+  onboarding: no OAuth grant, no project token, `ic-agent.ts` never runs.
+
 ## Persistence & autosave
 
 `src/components/workbook/Workbook.tsx`: debounced (1.2 s)

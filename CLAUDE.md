@@ -33,6 +33,14 @@ the delta echo, the engine pin, or presence.
   project token); the token is stored encrypted per user
   (`src/lib/inference.ts`) and the Sheets agent is provisioned in *their*
   project (`src/lib/ic-agent.ts`). `docs/architecture.md` has the flow.
+- **The browser's own agent** (ChatGPT desktop's browser, Chrome) can drive
+  the workbook over **WebMCP**: the page publishes the same client-side tools via
+  `src/lib/webmcp.ts` + `useWebMcpTools`, and the model, the turn and the bill are
+  all on their side — no Ingram Cloud link needed. Offered as the second option in
+  the setup dialog, disabled where the browser lacks the API. Still an origin
+  trial (Chrome 149-156): locally it needs
+  `chrome://flags/#enable-webmcp-testing`, in production the token in
+  `NEXT_PUBLIC_WEBMCP_ORIGIN_TRIAL`.
 - **Claude Code connects over MCP** at `POST /api/mcp` (`src/lib/mcp/`),
   authenticated by OAuth (Better Auth's `mcp` plugin), executing server-side
   against sheetkit-wasm. An open tab polls and shows those edits as they land.

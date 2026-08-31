@@ -8,8 +8,9 @@ import {
 	ExternalLinkIcon,
 	KeyRoundIcon,
 	Loader2Icon,
+	MonitorIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toaster";
 import { deferInference, type InferenceView } from "@/lib/inference-client";
 import { cn } from "@/lib/utils";
+import { agentMode, setAgentMode, webMcpSupported } from "@/lib/webmcp";
 
 import { currentPath, parseInferenceView } from "./useInference";
 
@@ -31,12 +33,15 @@ type Step = "choose" | "paste";
 const CONSOLE_BILLING = "https://cloud.ingram.tech/console/settings/billing";
 
 /**
- * Setup + settings for how the agent is powered: the user's own Ingram Cloud
- * organization. "Link Ingram Cloud" is one click — IC signs them in or up,
- * they pick an organization, and IC hands us a project token for a project
- * it creates there (`src/lib/ic-oauth.ts`). Pasting a project token is the
- * fallback. Inference then runs, and bills, on that project; we never hold a
- * provider key.
+ * Setup + settings for how the agent is powered.
+ *
+ * Two answers. Ingram Cloud: "Link Ingram Cloud" is one click — IC signs them
+ * in or up, they pick an organization, and IC hands us a project token for a
+ * project it creates there (`src/lib/ic-oauth.ts`); pasting a project token is
+ * the fallback. Inference then runs, and bills, on that project; we never hold
+ * a provider key. Or the browser's own agent over WebMCP, where the model is
+ * ChatGPT's or Chrome's, the workbook's tools are published to it, and there
+ * is nothing to link — offered only where the browser has the API.
  *
  * Fully controlled — the host decides when to open it: as a first-run nudge,
  * as settings (from the menu), or when the user tries to message the agent
@@ -62,6 +67,13 @@ export function SetupWizard({
 	const [token, setToken] = useState("");
 	const [saving, setSaving] = useState(false);
 	const [linking, setLinking] = useState(false);
+	// Whether this browser has the WebMCP API, and which way the user chose.
+	// Both live only in the browser, so they read as external stores rather
+	// than effects — the dialog can be open on the very first paint.
+	const [modeChoice, setModeChoice] = useState<string | null>(null);
+	const webMcp = useSyncExternalStore(subscribeNever, webMcpSupported, () => false);
+	const storedMode = useSyncExternalStore(subscribeNever, agentMode, () => null);
+	const mode = modeChoice ?? storedMode;
 
 	// Each time it opens, reset to the top. Adjusted during render off a
 	// previous-prop sentinel rather than in an effect: an effect would paint
@@ -107,6 +119,13 @@ export function SetupWizard({
 	// it so the automatic nudge stays quiet (the send-time gate still fires).
 	const dismiss = () => {
 		if (!credential) deferInference();
+		onOpenChange(false);
+	};
+
+	const chooseBrowserAgent = () => {
+		setAgentMode("webmcp");
+		setModeChoice("webmcp");
+		toast.success("Your browser's agent can now drive this workbook.");
 		onOpenChange(false);
 	};
 
@@ -178,9 +197,10 @@ export function SetupWizard({
 						<DialogHeader>
 							<DialogTitle>Power the agent</DialogTitle>
 							<DialogDescription>
-								The agent runs on Ingram Cloud, in your own
-								organization. Inference bills to you there — we never
-								hold a key.
+								Either run it on Ingram Cloud in your own organization,
+								where inference bills to you and we never hold a key —
+								or let the agent already in your browser drive the
+								sheet.
 							</DialogDescription>
 						</DialogHeader>
 
@@ -229,7 +249,25 @@ export function SetupWizard({
 							</div>
 						) : null}
 
+						{mode === "webmcp" ? (
+							<div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
+								<MonitorIcon className="size-3.5 shrink-0 text-primary" />
+								<span>
+									Your browser&rsquo;s agent drives this workbook.
+									Open a sheet and look for its site tools.
+								</span>
+							</div>
+						) : null}
+
 						<div className="space-y-2">
+							<OptionRow
+								icon={MonitorIcon}
+								title="Use your browser's agent"
+								description="ChatGPT or Chrome operates the sheet directly over WebMCP. Nothing to link, and the turns run on their side."
+								onClick={webMcp ? chooseBrowserAgent : undefined}
+								disabled={!webMcp}
+								tag={webMcp ? undefined : "Unsupported here"}
+							/>
 							{view?.linkAvailable ? (
 								<OptionRow
 									icon={linking ? Loader2Icon : CloudIcon}
@@ -333,6 +371,11 @@ export function SetupWizard({
 			</DialogContent>
 		</Dialog>
 	);
+}
+
+/** Neither fact changes without a reload, so there is nothing to subscribe to. */
+function subscribeNever(): () => void {
+	return () => {};
 }
 
 function errorOf(body: unknown): string | null {
