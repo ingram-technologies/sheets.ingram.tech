@@ -44,31 +44,40 @@ import { ImportCsv } from "@/components/files/ImportCsv";
 import { OpenFromGoogle } from "@/components/files/OpenFromGoogle";
 import { TrashDialog } from "@/components/files/TrashDialog";
 import { SetupWizard } from "@/components/inference/SetupWizard";
+import { useInference } from "@/components/inference/useInference";
 import { ensureIronCalc, Model } from "@/components/workbook/ironcalc";
 import { bytesToBase64 } from "@/lib/bytes";
-import { isInferenceConfigured, isInferenceDeferred } from "@/lib/inference-prefs";
+import { type InferenceView, isInferenceDeferred } from "@/lib/inference-client";
 import type { WorkbookMeta } from "@/lib/workbooks";
 
 const subscribeNever = () => () => {};
 
-export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
+export function FileManager({
+	workbooks,
+	inference,
+}: {
+	workbooks: WorkbookMeta[];
+	/** Server-rendered, so the first-run nudge needs no round trip. */
+	inference: InferenceView;
+}) {
 	const router = useRouter();
 	const [creating, setCreating] = useState(false);
 	const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
 	const [trashOpen, setTrashOpen] = useState(false);
-	// First-run nudge: the setup opens by itself unless inference is already
-	// configured or the user chose to look around first. Both live in
-	// localStorage, which the server cannot read — so the nudge is an external
-	// store (false on the server, the real answer on the client's first render)
-	// rather than an effect that opened the dialog a frame late. Once the user
-	// opens or closes it themselves that choice wins.
+	const { view, setView, refresh } = useInference(inference);
+	// First-run nudge: the setup opens by itself unless the user has linked
+	// Ingram Cloud (server truth, passed in) or chose to look around first —
+	// which lives in localStorage, which the server cannot read. So that half
+	// is an external store (false on the server, the real answer on the
+	// client's first render) rather than an effect that opened the dialog a
+	// frame late. Once the user opens or closes it themselves that choice wins.
 	const [inferenceChoice, setInferenceChoice] = useState<boolean | null>(null);
-	const shouldNudge = useSyncExternalStore(
+	const deferred = useSyncExternalStore(
 		subscribeNever,
-		() => !isInferenceConfigured() && !isInferenceDeferred(),
+		isInferenceDeferred,
 		() => false,
 	);
-	const inferenceOpen = inferenceChoice ?? shouldNudge;
+	const inferenceOpen = inferenceChoice ?? (view?.credential === null && !deferred);
 	const setInferenceOpen = setInferenceChoice;
 
 	const createWorkbook = async () => {
@@ -136,7 +145,13 @@ export function FileManager({ workbooks }: { workbooks: WorkbookMeta[] }) {
 
 	return (
 		<main className="mx-auto w-full max-w-4xl px-6 py-10">
-			<SetupWizard open={inferenceOpen} onOpenChange={setInferenceOpen} />
+			<SetupWizard
+				open={inferenceOpen}
+				onOpenChange={setInferenceOpen}
+				view={view}
+				onViewChange={setView}
+				refresh={refresh}
+			/>
 			<PageHeader
 				icon={SheetsMark}
 				iconClassName="bg-primary/10 text-primary"

@@ -5,15 +5,20 @@ import { z } from "zod";
 
 import { AGENT_TOOL_DESCRIPTIONS, agentToolSchemas } from "@/lib/agent-tools";
 import { icShimFetch } from "@/lib/ic-stream-shim";
-import { smithExternalId } from "@/lib/ingram-cloud";
+import {
+	describeIcError,
+	loadInference,
+	recordInferenceError,
+	recordInferenceUse,
+} from "@/lib/inference";
+import { INFERENCE_NOT_CONFIGURED } from "@/lib/inference-client";
 import { requireApiUser } from "@/lib/session";
 
 export const maxDuration = 120;
 
-// Ingram Cloud runs inference — hosted keys by default, or the user's own key
-// when they've attached one to their smith (see lib/ingram-cloud.ts). ""
-// means the IC agent's configured model (claude-opus-4-8, owned by the sheets
-// Pulumi stack); set SHEETS_CHAT_MODEL to override per-deployment.
+// Ingram Cloud runs inference on the USER'S OWN project (see lib/inference.ts)
+// — Sheets holds no key. "" means the Sheets agent's published model
+// (lib/ic-agent.ts); set SHEETS_CHAT_MODEL to override per-deployment.
 const MODEL = process.env.SHEETS_CHAT_MODEL ?? "";
 
 const SYSTEM_PROMPT = `You are the spreadsheet agent of sheets.ingram.tech, working live inside the user's workbook. The user sees your cursor, highlights, and every cell you touch in real time.
@@ -51,16 +56,31 @@ export async function POST(request: Request) {
 	// UIMessage[] is structurally validated by convertToModelMessages below.
 	const messages = messagesAsUi(parsed.data.messages);
 
-	// Tenant token + IC-Agent-Id + the `user` field below: Ingram Cloud lazily
+	// The user's own project token (linked via IC's app grant, or pasted). No
+	// credential → 409, which the chat panel turns into the setup dialog
+	// rather than an error. A stale agent is reconciled inside loadInference.
+	let inference: Awaited<ReturnType<typeof loadInference>>;
+	try {
+		inference = await loadInference(gate.userId);
+	} catch (error) {
+		return Response.json({ error: describeIcError(error) }, { status: 502 });
+	}
+	if (!inference) {
+		return Response.json({ error: INFERENCE_NOT_CONFIGURED }, { status: 409 });
+	}
+
+	// Project token + IC-Agent-Id + the `user` field below: Ingram Cloud lazily
 	// provisions one smith per (user, agent) — no provisioning code here. Turns
 	// stay stateless (no threadId): the messages we send are the whole context,
 	// and the browser owns the history exactly as before the port.
 	const ingram = createIngramCloud({
-		apiKey: process.env.INGRAM_CLOUD_TOKEN ?? "",
-		headers: { "IC-Agent-Id": process.env.IC_AGENT_ID ?? "" },
+		apiKey: inference.conn.apiKey,
+		baseURL: `${inference.conn.baseURL}/v1`,
+		headers: { "IC-Agent-Id": inference.agentId },
 		// Temporary SSE normalizer — see src/lib/ic-stream-shim.ts.
 		fetch: icShimFetch,
 	});
+	const userId = gate.userId;
 
 	const result = streamText({
 		model: ingram(MODEL),
@@ -70,9 +90,11 @@ export async function POST(request: Request) {
 		messages: await convertToModelMessages(
 			withWorkbookState(messages, parsed.data.overview, parsed.data.userEdits),
 		),
-		// Single-sourced with the management-plane `external_id` so a BYOK key set
-		// on the smith and this run resolve to the SAME smith (cloud#170).
-		providerOptions: { openai: { user: smithExternalId(gate.userId) } },
+		// One smith per (user, agent) in the user's own project.
+		providerOptions: { openai: { user: inference.principal } },
+		onFinish: () => {
+			void recordInferenceUse(userId).catch(() => {});
+		},
 		stopWhen: stepCountIs(24),
 		// All tools execute client-side against the in-browser engine — no
 		// execute functions here; calls are forwarded to the browser.
@@ -133,8 +155,16 @@ export async function POST(request: Request) {
 		// masked default ("An error occurred.") — this app has no third-party
 		// users yet and gateway errors (billing tier, model access, rate
 		// limits) are exactly what the person in front of it needs to see.
-		onError: (error) =>
-			error instanceof Error ? error.message : "Chat failed — check server logs.",
+		onError: (error) => {
+			const message =
+				error instanceof Error
+					? error.message
+					: "Chat failed — check server logs.";
+			// Remember the failure on the credential so setup can point at the
+			// fix (a 402 card_required / insufficient_credits → "Add funds").
+			void recordInferenceError(userId, message).catch(() => {});
+			return message;
+		},
 	});
 }
 

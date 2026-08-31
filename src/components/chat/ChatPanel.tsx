@@ -26,10 +26,11 @@ import {
 import { Streamdown } from "streamdown";
 
 import { SetupWizard } from "@/components/inference/SetupWizard";
+import { useInference } from "@/components/inference/useInference";
 import { Button } from "@/components/ui/button";
 import type { AgentToolName } from "@/lib/agent-tools";
 import { agentToolSchemas } from "@/lib/agent-tools";
-import { isInferenceConfigured } from "@/lib/inference-prefs";
+import { INFERENCE_NOT_CONFIGURED } from "@/lib/inference-client";
 import { cn } from "@/lib/utils";
 
 import { AgentExecutor } from "../workbook/agent-executor";
@@ -96,6 +97,7 @@ export function ChatPanel({
 }) {
 	const [input, setInput] = useState("");
 	const [setupOpen, setSetupOpen] = useState(false);
+	const inference = useInference();
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	// The user-delta echo: cells the user edits by hand accumulate here, show
 	// as passive chips in the transcript, and reach the agent at the earliest
@@ -224,11 +226,24 @@ export function ChatPanel({
 
 	const busy = status === "streaming" || status === "submitted";
 
+	// The server's own gate: a turn sent without a linked account answers 409
+	// inference_not_configured. Open setup instead of showing it as an error —
+	// adjusted during render off the last error seen, so the dialog opens in
+	// the same frame the error lands rather than one frame late.
+	const notConfigured = error?.message.includes(INFERENCE_NOT_CONFIGURED) ?? false;
+	const [handledError, setHandledError] = useState<Error>();
+	if (notConfigured && error !== handledError) {
+		setHandledError(error);
+		setSetupOpen(true);
+	}
+
 	const send = (text: string) => {
 		if (!text.trim() || busy) return;
-		// Gate: if the user hasn't set up inference (they may have chosen "look
-		// around first"), pop the setup instead of sending — and keep their text.
-		if (!isInferenceConfigured()) {
+		// Gate: if the user hasn't linked Ingram Cloud (they may have chosen
+		// "look around first"), pop the setup instead of sending — and keep
+		// their text. While the status is still loading, send and let the
+		// server's 409 open it.
+		if (inference.view && !inference.view.credential) {
 			setSetupOpen(true);
 			return;
 		}
@@ -374,7 +389,7 @@ export function ChatPanel({
 					</Fragment>
 				))}
 
-				{error ? (
+				{error && !notConfigured ? (
 					<div
 						role="alert"
 						className="space-y-2 rounded-md border border-destructive-ink/40 bg-destructive-ink/10 px-3 py-2 text-xs text-destructive-ink"
@@ -443,7 +458,13 @@ export function ChatPanel({
 				</div>
 			</form>
 
-			<SetupWizard open={setupOpen} onOpenChange={setSetupOpen} />
+			<SetupWizard
+				open={setupOpen}
+				onOpenChange={setSetupOpen}
+				view={inference.view}
+				onViewChange={inference.setView}
+				refresh={inference.refresh}
+			/>
 		</div>
 	);
 }

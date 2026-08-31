@@ -77,3 +77,37 @@ export const workbooks = pgTable(
 		),
 	],
 );
+
+/**
+ * A user's own Ingram Cloud project token — the seam between "whose chat is
+ * this" and "which IC project runs and pays for it" (`src/lib/inference.ts`).
+ * Sheets holds no inference key of its own: no row → no agent for that user.
+ *
+ * `user_id` is Better Auth's id; like `workbook.user_id` the FK to `user` is
+ * hand-written (drizzle/0010) because Better Auth's tables are deliberately
+ * not in this schema.
+ */
+export const inferenceCredential = pgTable("inference_credential", {
+	userId: text("user_id").primaryKey(),
+	/** AES-256-GCM under SHEETS_CREDENTIALS_KEY (`src/lib/secrets.ts`). */
+	tokenCiphertext: text("token_ciphertext").notNull(),
+	/** The token's tail — the only part ever shown again. */
+	tokenHint: text("token_hint").notNull(),
+	/** Minted by IC's app grant (`src/lib/ic-oauth.ts`) or pasted by hand. An
+	 *  OAuth-linked user can be sent to IC's billing page with a return URL; a
+	 *  pasted one cannot. */
+	source: text("source", { enum: ["oauth", "paste"] }).notNull(),
+	/** IC API origin override; null → the SDK default. */
+	baseUrl: text("base_url"),
+	/** The Sheets agent in THAT project (`agt_…`, IC-minted). */
+	agentId: text("agent_id").notNull(),
+	/** `AGENT_SIG` at publish time; drift triggers a reconcile. */
+	agentSig: text("agent_sig").notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+	updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+	lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+	/** Last chat/provisioning failure, surfaced in the setup dialog; cleared
+	 *  on the next success. */
+	lastError: text("last_error"),
+	lastErrorAt: timestamp("last_error_at", { withTimezone: true }),
+});

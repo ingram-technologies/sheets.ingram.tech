@@ -29,16 +29,21 @@ bun run dev     # PGlite (no Docker) + migrations + next dev on :3000
 ```
 
 Google sign-in gates every page, so `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`
-are required to use the app at all; `ANTHROPIC_API_KEY` is needed only for the
-agent chat. Get both from `vercel env pull`. Nothing else needs configuring
-locally — `bun run dev` boots its own database.
+are required to use the app at all. The agent chat needs no platform key: each
+user links their own Ingram Cloud organization from the app (one click, or a
+pasted project token), which needs `SHEETS_CREDENTIALS_KEY` to store it and
+`SHEETS_OAUTH_PRIVATE_KEY` for the one-click path. Get them from
+`vercel env pull`. Nothing else needs configuring locally — `bun run dev` boots
+its own database.
 
 ## Env
 
 | Var | What |
 | --- | --- |
 | `DATABASE_URL` | Postgres (unset locally — `bun run dev` boots PGlite) |
-| `ANTHROPIC_API_KEY` | Anthropic API key for the agent chat |
+| `SHEETS_CREDENTIALS_KEY` | Encrypts users' Ingram Cloud tokens at rest (any string ≥ 32 chars; `openssl rand -hex 32`). Rotating it means every user re-links |
+| `SHEETS_OAUTH_PRIVATE_KEY` | One-click "Link Ingram Cloud": an RSA PKCS8 private key (PEM, base64 accepted) behind `/oauth/jwks.json`. Unset → only the paste-a-token path is offered. `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \| base64 -w0` |
+| `INGRAM_CLOUD_API_BASE` / `INGRAM_CLOUD_CONSOLE_URL` | Optional — a self-hosted Ingram Cloud (defaults `https://api.cloud.ingram.tech` / `https://cloud.ingram.tech`) |
 | `SHEETS_CHAT_MODEL` | Optional model override, default `claude-opus-4-8` |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Shared Ingram Google OAuth client (from the infra `platform` stack) |
 | `BETTER_AUTH_SECRET` | Session signing secret (dev falls back to a placeholder) |

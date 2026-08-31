@@ -16,7 +16,7 @@ import { authClient } from "@/lib/auth-client";
 export function UserMenu({
 	onOpenInferenceSettings,
 }: {
-	/** When provided, adds an "Inference key" item (the home surface passes it;
+	/** When provided, adds an "Ingram Cloud" item (the home surface passes it;
 	 *  the workbook header omits it). */
 	onOpenInferenceSettings?: () => void;
 } = {}) {
@@ -77,7 +77,7 @@ export function UserMenu({
 				{onOpenInferenceSettings ? (
 					<DropdownMenuItem onClick={onOpenInferenceSettings}>
 						<KeyRoundIcon className="size-4" />
-						Inference key
+						Ingram Cloud
 					</DropdownMenuItem>
 				) : null}
 				<DropdownMenuItem

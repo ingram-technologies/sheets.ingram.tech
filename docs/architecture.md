@@ -197,15 +197,40 @@ version and will replace it.
 ## The agent loop (in-app chat)
 
 - `/api/chat` (`src/app/api/chat/route.ts`): AI SDK `streamText` against
-  **Ingram Cloud** (`@ingram-cloud/ai-sdk`; tenant token + `IC-Agent-Id`, model
-  from the IC agent config, `SHEETS_CHAT_MODEL` overrides). IC lazily
-  provisions one smith per user (`user:<better-auth-id>`); per-user BYOK
-  attaches the user's provider key to that smith so their inference bills to
-  them (`src/lib/ingram-cloud.ts`, cloud.ingram.tech#170). A temporary SSE
-  shim (`src/lib/ic-stream-shim.ts`) normalizes the stream until
+  **Ingram Cloud** (`@ingram-cloud/ai-sdk`; the user's project token +
+  `IC-Agent-Id`, model from the published agent, `SHEETS_CHAT_MODEL`
+  overrides). IC lazily provisions one smith per user
+  (`user:<better-auth-id>`). A temporary SSE shim
+  (`src/lib/ic-stream-shim.ts`) normalizes the stream until
   cloud.ingram.tech#165 lands. Tools are declared **without `execute`** — the
   SDK forwards calls to the browser. `stopWhen: stepCountIs(24)` caps a single
-  turn's tool loop.
+  turn's tool loop. No credential → `409 inference_not_configured`, which the
+  chat panel turns into the setup dialog.
+- **Sheets holds no inference key.** Each user's chat runs — and bills — on
+  their own Ingram Cloud project (`src/lib/inference.ts`, table
+  `inference_credential`, one row per user, token AES-GCM-encrypted under
+  `SHEETS_CREDENTIALS_KEY` via `src/lib/secrets.ts`). Two ways in:
+  - **Link Ingram Cloud** (`src/lib/ic-oauth.ts`, the default) is IC's *app
+    grant* (cloud.ingram.tech#261): `/internal/connect/ingram-cloud/start`
+    parks the user + PKCE verifier + nonce + return path in a signed cookie and
+    sends the browser to IC's `/oauth/authorize` with no `resource` and
+    `scope=tenant:*`; IC's console signs them in or up, picks/creates an org,
+    consents, and creates a project named after Sheets; `…/callback` checks
+    `state`/`iss`, redeems the code and stores the `tha_live_…` token. Sheets'
+    identity to IC is a **Client ID Metadata Document**: `client_id` is the URL
+    of `/oauth/client.json`, which declares `private_key_jwt` with `jwks_uri =
+    /oauth/jwks.json`; code exchanges carry an RFC 7523 assertion signed with
+    `SHEETS_OAUTH_PRIVATE_KEY`, so no secret is shared with IC. Unset key → the
+    link button isn't offered.
+  - **Paste a project token** (`POST /api/inference`) is the fallback.
+  Either way `saveInferenceCredential` verifies the token, provisions the
+  Sheets agent in that project (`src/lib/ic-agent.ts`: create-or-adopt by
+  slug `ingram-sheets`, empty instructions on purpose — the route's `system` is
+  the whole prompt — publish only on content change, 100% rollout; `AGENT_SIG`
+  drift reconciles on the next turn), and only then writes the row. A `402
+  card_required` / `insufficient_credits` on a turn lands on the credential
+  and setup shows "Add funds" → IC's console billing page with `client_id` +
+  `return_url` for OAuth-linked users. Same design as depot's.
 - `src/components/chat/ChatPanel.tsx` runs `onToolCall` → `AgentExecutor`
   (`src/components/workbook/agent-executor.ts`), which executes against the
   controller and returns a text result via `addToolOutput`;

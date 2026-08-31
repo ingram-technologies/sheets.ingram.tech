@@ -25,10 +25,14 @@ the delta echo, the engine pin, or presence.
 - `WorkbookController` (`src/components/workbook/controller.ts`) is the single
   owner of the model: every read/write from React, keyboard, and agent tools
   goes through it.
-- The agent chats via `/api/chat` (AI SDK + direct Anthropic API) but its
-  tools execute **client-side** against the same controller — that's what
-  makes its activity visible live in the grid (presence overlays, pulses,
-  highlights).
+- The agent chats via `/api/chat` (AI SDK over Ingram Cloud) but its tools
+  execute **client-side** against the same controller — that's what makes its
+  activity visible live in the grid (presence overlays, pulses, highlights).
+- **Sheets holds no inference key.** Each user links their own Ingram Cloud
+  organization (one-click IC app grant via `src/lib/ic-oauth.ts`, or a pasted
+  project token); the token is stored encrypted per user
+  (`src/lib/inference.ts`) and the Sheets agent is provisioned in *their*
+  project (`src/lib/ic-agent.ts`). `docs/architecture.md` has the flow.
 - **Claude Code connects over MCP** at `POST /api/mcp` (`src/lib/mcp/`),
   authenticated by OAuth (Better Auth's `mcp` plugin), executing server-side
   against sheetkit-wasm. An open tab polls and shows those edits as they land.
