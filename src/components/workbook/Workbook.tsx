@@ -16,12 +16,15 @@ import { ChatPanel } from "@/components/chat/ChatPanel";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toaster";
 
+import { loadScratchBytes, saveScratchBytes } from "@/lib/local-workbook";
+
 import { WorkbookController } from "./controller";
 import { ensureIronCalc, Model } from "./ironcalc";
 import { FileMenu } from "./FileMenu";
 import { FormulaBar } from "./FormulaBar";
 import type { EditingState } from "./Grid";
 import { Grid } from "./Grid";
+import { ScratchAgentPanel } from "./ScratchAgentPanel";
 import { SheetTabs } from "./SheetTabs";
 import { useWebMcpTools } from "./useWebMcpTools";
 import { StatusBar } from "./StatusBar";
@@ -83,7 +86,9 @@ export function Workbook({
 	name: initialName,
 	googleSpreadsheetId,
 }: {
-	id: string;
+	/** `null` is the scratch workbook: no row, no owner, no server. Every
+	 *  persistence path below short-circuits to localStorage. */
+	id: string | null;
 	name: string;
 	googleSpreadsheetId: string | null;
 }) {
@@ -122,6 +127,21 @@ export function Workbook({
 		let cancelled = false;
 		async function load() {
 			try {
+				if (id === null) {
+					await ensureIronCalc();
+					if (cancelled) return;
+					const saved = loadScratchBytes();
+					const timezone =
+						Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+					setController(
+						new WorkbookController(
+							saved
+								? Model.from_bytes(saved, "en")
+								: new Model("workbook", "en", timezone, "en"),
+						),
+					);
+					return;
+				}
 				const [, response] = await Promise.all([
 					ensureIronCalc(),
 					fetch(`/api/workbooks/${id}/bytes`),
@@ -172,6 +192,14 @@ export function Workbook({
 			}
 			if (!isRetry) attempt.current = 0;
 			setSaveState("saving");
+			if (id === null) {
+				// The scratch workbook never leaves the browser. No version, no
+				// compare-and-swap: nothing else can be writing it.
+				setSaveState(
+					saveScratchBytes(controller.serialize()) ? "saved" : "failed",
+				);
+				return;
+			}
 			try {
 				const bytes = controller.serialize();
 				const known = version.current;
@@ -306,7 +334,8 @@ export function Workbook({
 	 * get the explicit choice instead.
 	 */
 	useEffect(() => {
-		if (!controller) return;
+		// Nothing outside this tab can touch the scratch workbook.
+		if (!controller || id === null) return;
 		let stopped = false;
 		let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -358,6 +387,10 @@ export function Workbook({
 			const trimmed = next.trim();
 			if (!trimmed) return false;
 			if (trimmed === name) return true;
+			if (id === null) {
+				setName(trimmed);
+				return true;
+			}
 			const previous = name;
 			setName(trimmed);
 			try {
@@ -514,10 +547,14 @@ export function Workbook({
 								aria-label="Agent"
 								className="absolute inset-y-0 right-0 z-[var(--z-sticky)] w-80 max-w-[85vw] border-l border-border bg-background md:static md:z-auto md:w-80 md:max-w-none xl:w-96"
 							>
-								<ChatPanel
-									controller={controller}
-									renameDocument={renameDocument}
-								/>
+								{id === null ? (
+									<ScratchAgentPanel />
+								) : (
+									<ChatPanel
+										controller={controller}
+										renameDocument={renameDocument}
+									/>
+								)}
 							</aside>
 						) : null}
 					</div>

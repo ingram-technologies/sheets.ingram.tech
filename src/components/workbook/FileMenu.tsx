@@ -47,8 +47,10 @@ export function FileMenu({
 	initialGoogleSpreadsheetId,
 }: {
 	controller: WorkbookController | null;
-	workbookId: string;
 	name: string;
+	/** `null` on the scratch workbook, which has no row to link a Google
+	 *  spreadsheet to — the Google items are hidden rather than disabled. */
+	workbookId: string | null;
 	initialGoogleSpreadsheetId: string | null;
 }) {
 	const [busy, setBusy] = useState(false);
@@ -140,20 +142,22 @@ export function FileMenu({
 					}
 				/>
 				<DropdownMenuContent align="start" className="min-w-56">
-					<DropdownMenuItem
-						onClick={() => {
-							// Re-saving full-replaces the linked spreadsheet. Doing
-							// that to a live Google doc deserves a confirmation; the
-							// first save creates a new one and doesn't.
-							if (googleId) setConfirmOverwrite(true);
-							else void saveToGoogle();
-						}}
-					>
-						<FileUpIcon className="size-4" />
-						{googleId
-							? "Save to linked Google Sheet"
-							: "Save to Google Sheets"}
-					</DropdownMenuItem>
+					{workbookId === null ? null : (
+						<DropdownMenuItem
+							onClick={() => {
+								// Re-saving full-replaces the linked spreadsheet. Doing
+								// that to a live Google doc deserves a confirmation; the
+								// first save creates a new one and doesn't.
+								if (googleId) setConfirmOverwrite(true);
+								else void saveToGoogle();
+							}}
+						>
+							<FileUpIcon className="size-4" />
+							{googleId
+								? "Save to linked Google Sheet"
+								: "Save to Google Sheets"}
+						</DropdownMenuItem>
+					)}
 					{googleId ? (
 						<DropdownMenuItem
 							onClick={() =>
