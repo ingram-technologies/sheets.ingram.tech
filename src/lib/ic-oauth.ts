@@ -204,14 +204,24 @@ export function readFlight(cfg: IcOauthConfig, cookie: string): Flight | null {
 	};
 }
 
+/**
+ * The scopes Sheets asks for on an app grant.
+ *
+ * Not `tenant:*`. Agents, smiths and runs all gate on `runs:*` in the API, and
+ * an app token carries no principal, so that is the whole of what we need —
+ * asking for the tenant master key to run a spreadsheet agent would be a
+ * grant we could never justify to the person granting it.
+ */
+const APP_SCOPES = ["runs:read", "runs:write"];
+
 /** Where to send the browser: IC's authorize endpoint, asking for an app grant
- *  (no `resource`) with full access to the project IC will create. */
+ *  (no `resource`) scoped to what Sheets actually does. */
 export function authorizeUrl(cfg: IcOauthConfig, flight: Flight): string {
 	const u = new URL(`${cfg.apiBase}/oauth/authorize`);
 	u.searchParams.set("response_type", "code");
 	u.searchParams.set("client_id", cfg.clientId);
 	u.searchParams.set("redirect_uri", cfg.redirectUri);
-	u.searchParams.set("scope", "tenant:*");
+	u.searchParams.set("scope", APP_SCOPES.join(" "));
 	u.searchParams.set(
 		"code_challenge",
 		createHash("sha256").update(flight.verifier).digest("base64url"),

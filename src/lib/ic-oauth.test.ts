@@ -96,7 +96,7 @@ describe("the in-flight cookie", () => {
 		const u = new URL(authorizeUrl(c, flight));
 		expect(u.searchParams.get("state")).toBe(flight.nonce);
 		expect(u.searchParams.get("code_challenge_method")).toBe("S256");
-		expect(u.searchParams.get("scope")).toBe("tenant:*");
+		expect(u.searchParams.get("scope")).toBe("runs:read runs:write");
 		expect(u.searchParams.has("resource")).toBe(false);
 	});
 
