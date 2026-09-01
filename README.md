@@ -5,7 +5,7 @@ AI-native collaborative spreadsheets. The spreadsheet engine
 in the same workbook through chat, and you watch it work — live cursor,
 change pulses, highlights.
 
-Private product UI of the Sheets project.
+The product UI half; Apache-2.0, like the engine.
 
 ## Docs
 
@@ -48,5 +48,6 @@ its own database.
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Shared Ingram Google OAuth client (from the infra `platform` stack) |
 | `BETTER_AUTH_SECRET` | Session signing secret (dev falls back to a placeholder) |
 | `BETTER_AUTH_URL` | Canonical origin, `https://sheets.ingram.tech` in prod |
+| `NEXT_PUBLIC_WEBMCP_ORIGIN_TRIAL` | Optional — Chrome origin-trial token for WebMCP (trial runs Chrome 149-156). Unset → the browser's agent is never offered; locally use `chrome://flags/#enable-webmcp-testing` instead |
 | `NEXT_PUBLIC_GOOGLE_PICKER_API_KEY` | Optional — API key (same Google project as the OAuth client) enabling "Browse Google Drive" via the Google Picker |
 | `NEXT_PUBLIC_GOOGLE_PICKER_APP_ID` | Optional — that Google project's number (Picker `setAppId`) |
