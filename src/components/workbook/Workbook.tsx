@@ -25,6 +25,7 @@ import { FormulaBar } from "./FormulaBar";
 import type { EditingState } from "./Grid";
 import { Grid } from "./Grid";
 import { ScratchAgentPanel } from "./ScratchAgentPanel";
+import type { WebMcpCall } from "./webmcp-log";
 import { SheetTabs } from "./SheetTabs";
 import { useWebMcpTools } from "./useWebMcpTools";
 import { StatusBar } from "./StatusBar";
@@ -410,9 +411,15 @@ export function Workbook({
 		[id, name],
 	);
 
-	// Offer the workbook's tools to an agent driving the browser (WebMCP).
-	// No-op where the browser has no model context.
-	useWebMcpTools(controller, renameDocument);
+	// Offer the workbook's tools to an agent driving the browser (WebMCP), and
+	// keep what it did — the scratch panel is the only place that shows it,
+	// because the conversation itself happens outside this tab. No-op where the
+	// browser has no model context.
+	const [webMcpCalls, setWebMcpCalls] = useState<WebMcpCall[]>([]);
+	const onWebMcpCall = useCallback((call: Omit<WebMcpCall, "id">) => {
+		setWebMcpCalls((prev) => [...prev, { ...call, id: prev.length }]);
+	}, []);
+	useWebMcpTools(controller, renameDocument, onWebMcpCall);
 
 	// Debounced autosave on every content mutation.
 	useEffect(() => {
@@ -548,7 +555,7 @@ export function Workbook({
 								className="absolute inset-y-0 right-0 z-[var(--z-sticky)] w-80 max-w-[85vw] border-l border-border bg-background md:static md:z-auto md:w-80 md:max-w-none xl:w-96"
 							>
 								{id === null ? (
-									<ScratchAgentPanel />
+									<ScratchAgentPanel calls={webMcpCalls} />
 								) : (
 									<ChatPanel
 										controller={controller}

@@ -10,6 +10,8 @@ import {
 } from "@/lib/agent-tools";
 import { registerWebMcpTools } from "@/lib/webmcp";
 
+import { summarize, type WebMcpCall } from "./webmcp-log";
+
 import { AgentExecutor } from "./agent-executor";
 import type { WorkbookController } from "./controller";
 
@@ -54,6 +56,8 @@ const COLD_START =
 export function useWebMcpTools(
 	controller: WorkbookController | null,
 	renameDocument: (name: string) => Promise<boolean>,
+	/** Notified after every call, so the page can show what was done to it. */
+	onCall?: (call: Omit<WebMcpCall, "id">) => void,
 ): void {
 	useEffect(() => {
 		if (!controller) return;
@@ -78,11 +82,14 @@ export function useWebMcpTools(
 				// The host stringifies whatever comes back, so answer with the
 				// executor's text verbatim — wrapping it in MCP content blocks
 				// would reach the agent as JSON noise around the grid.
-				execute: (input: Record<string, unknown>) =>
-					executor.execute(name, input),
+				execute: async (input: Record<string, unknown>) => {
+					const result = await executor.execute(name, input);
+					onCall?.(summarize(name, input, result));
+					return result;
+				},
 			})),
 			teardown.signal,
 		);
 		return () => teardown.abort();
-	}, [controller, renameDocument]);
+	}, [controller, renameDocument, onCall]);
 }
