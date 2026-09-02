@@ -47,30 +47,45 @@ export function ScratchAgentPanel({ calls }: { calls: WebMcpCall[] }) {
 					{supported ? (
 						<>
 							<p className="text-xs leading-relaxed text-muted-foreground">
-								This sheet has published twelve tools &mdash; read
-								ranges, write cells, extend formulas, point at things.
-								They run here, in this tab.
+								Waiting for your agent. This sheet has published twelve
+								tools &mdash; read ranges, write cells, extend formulas,
+								point at things &mdash; and every call it makes will
+								show up here.
 							</p>
-							<div className="rounded-md border border-border bg-muted/40 p-3">
-								<p className="text-xs font-medium text-foreground">
-									There is no chat box here on purpose
-								</p>
-								<p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-									The agent is your browser&rsquo;s, not ours, so you
-									talk to it where it lives. Open the{" "}
-									<b className="font-medium text-foreground">
-										ChatGPT desktop app
-									</b>
-									, use its built-in browser to come back to this
-									page, then just ask. An arrow in the address bar
-									turns blue while it works, and every call it makes
-									shows up here.
-								</p>
-								<p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
-									Site tools need GPT-5.6 Sol or Terra &mdash; Luna
-									has them switched off.
-								</p>
-							</div>
+							{/*
+							 * A page cannot tell whether an agent is attached: the API
+							 * being present only means the browser supports it. So the
+							 * "how do I even talk to it" answer stays available and
+							 * stays shut, rather than lecturing someone who is already
+							 * standing in the right browser.
+							 */}
+							<details className="group rounded-md border border-border bg-muted/40">
+								<summary className="cursor-pointer list-none p-3 text-xs font-medium text-foreground [&::-webkit-details-marker]:hidden">
+									<span className="inline-block transition-transform group-open:rotate-90">
+										&rsaquo;
+									</span>{" "}
+									How do I talk to it?
+								</summary>
+								<div className="space-y-1.5 px-3 pb-3">
+									<p className="text-xs leading-relaxed text-muted-foreground">
+										The agent is your browser&rsquo;s, not ours, so
+										there is no chat box here &mdash; you talk to it
+										where it lives. Open the{" "}
+										<b className="font-medium text-foreground">
+											ChatGPT desktop app
+										</b>
+										, use its built-in browser to come back to this
+										page, then just ask. An arrow in the address bar
+										turns blue while it works.
+									</p>
+									<p className="text-xs leading-relaxed text-muted-foreground">
+										Site tools need GPT-5.6 Sol or Terra &mdash;
+										Luna has them switched off. If it starts
+										clicking around the page instead of calling
+										tools, tell it to use the site tools.
+									</p>
+								</div>
+							</details>
 							<p className="text-xs leading-relaxed text-muted-foreground">
 								The workbook is never uploaded to us: the engine runs in
 								this tab and the sheet is kept in this browser&rsquo;s
