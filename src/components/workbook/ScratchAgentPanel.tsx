@@ -47,71 +47,66 @@ export function ScratchAgentPanel({ calls }: { calls: WebMcpCall[] }) {
 					{supported ? (
 						<>
 							<p className="text-xs leading-relaxed text-muted-foreground">
-								Waiting for your agent. This sheet has published twelve
-								tools &mdash; read ranges, write cells, extend formulas,
-								point at things &mdash; and every call it makes will
-								show up here.
+								Waiting for your agent. This sheet publishes twelve
+								tools (read ranges, write cells, extend formulas,
+								highlight ranges) and logs every call below.
 							</p>
 							{/*
 							 * A page cannot tell whether an agent is attached: the API
 							 * being present only means the browser supports it. So the
-							 * "how do I even talk to it" answer stays available and
-							 * stays shut, rather than lecturing someone who is already
-							 * standing in the right browser.
+							 * instructions stay available and stay shut, rather than
+							 * lecturing someone already in the right browser.
 							 */}
 							<details className="group rounded-md border border-border bg-muted/40">
 								<summary className="cursor-pointer list-none p-3 text-xs font-medium text-foreground [&::-webkit-details-marker]:hidden">
 									<span className="inline-block transition-transform group-open:rotate-90">
 										&rsaquo;
 									</span>{" "}
-									How do I talk to it?
+									Using it
 								</summary>
 								<div className="space-y-1.5 px-3 pb-3">
 									<p className="text-xs leading-relaxed text-muted-foreground">
-										The agent is your browser&rsquo;s, not ours, so
-										there is no chat box here &mdash; you talk to it
-										where it lives. Open the{" "}
+										There is no chat box here: the agent runs in the
+										host browser, not in this page. Open this page
+										in the{" "}
 										<b className="font-medium text-foreground">
 											ChatGPT desktop app
 										</b>
-										, use its built-in browser to come back to this
-										page, then just ask. An arrow in the address bar
-										turns blue while it works.
+										&rsquo;s built-in browser and ask it there. The
+										address-bar arrow turns blue while it calls
+										tools.
 									</p>
 									<p className="text-xs leading-relaxed text-muted-foreground">
-										Site tools need GPT-5.6 Sol or Terra &mdash;
-										Luna has them switched off. If it starts
-										clicking around the page instead of calling
-										tools, tell it to use the site tools.
+										Requires GPT-5.6 Sol or Terra; Luna has site
+										tools disabled. If it drives the page by
+										clicking instead of calling tools, tell it to
+										use the site tools.
 									</p>
 								</div>
 							</details>
 							<p className="text-xs leading-relaxed text-muted-foreground">
-								The workbook is never uploaded to us: the engine runs in
-								this tab and the sheet is kept in this browser&rsquo;s
-								storage. Only the ranges the agent asks for go to
-								whoever runs the agent.
+								Ranges the agent reads go to whoever operates the agent.
+								Nothing else leaves: the engine runs in this tab, and
+								the workbook stays in this browser&rsquo;s storage
+								rather than being uploaded to us.
 							</p>
 						</>
 					) : (
 						<>
 							<p className="text-xs leading-relaxed text-muted-foreground">
-								This browser has no WebMCP support, so there is no agent
-								to hand the sheet to. The grid works anyway &mdash; it
-								always did.
+								This browser has no WebMCP support, so nothing can call
+								the sheet&rsquo;s tools. The grid works.
 							</p>
 							<p className="text-xs leading-relaxed text-muted-foreground">
-								To see the tools work, open this page in the{" "}
+								To see the tools run, open this page in the{" "}
 								<b className="font-medium text-foreground">
 									ChatGPT desktop app&rsquo;s built-in browser
-								</b>{" "}
-								and ask it to build something. Chrome 149 and up can
-								switch the API on at{" "}
+								</b>
+								. Chrome 149 and up can enable the API at{" "}
 								<code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
 									chrome://flags/#enable-webmcp-testing
 								</code>
-								, but a plain Chrome tab has no agent attached to call
-								them.
+								, but a plain Chrome tab has no agent to call the tools.
 							</p>
 						</>
 					)}
