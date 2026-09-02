@@ -47,11 +47,30 @@ export function ScratchAgentPanel({ calls }: { calls: WebMcpCall[] }) {
 					{supported ? (
 						<>
 							<p className="text-xs leading-relaxed text-muted-foreground">
-								This sheet has published twelve tools. Ask ChatGPT to
-								work in this tab and it can read ranges, write cells,
-								extend formulas and point at things &mdash; and you will
-								watch it happen here.
+								This sheet has published twelve tools &mdash; read
+								ranges, write cells, extend formulas, point at things.
+								They run here, in this tab.
 							</p>
+							<div className="rounded-md border border-border bg-muted/40 p-3">
+								<p className="text-xs font-medium text-foreground">
+									There is no chat box here on purpose
+								</p>
+								<p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+									The agent is your browser&rsquo;s, not ours, so you
+									talk to it where it lives. Open the{" "}
+									<b className="font-medium text-foreground">
+										ChatGPT desktop app
+									</b>
+									, use its built-in browser to come back to this
+									page, then just ask. An arrow in the address bar
+									turns blue while it works, and every call it makes
+									shows up here.
+								</p>
+								<p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">
+									Site tools need GPT-5.6 Sol or Terra &mdash; Luna
+									has them switched off.
+								</p>
+							</div>
 							<p className="text-xs leading-relaxed text-muted-foreground">
 								The workbook is never uploaded to us: the engine runs in
 								this tab and the sheet is kept in this browser&rsquo;s
@@ -60,14 +79,26 @@ export function ScratchAgentPanel({ calls }: { calls: WebMcpCall[] }) {
 							</p>
 						</>
 					) : (
-						<p className="text-xs leading-relaxed text-muted-foreground">
-							This browser has no WebMCP support, so there is no agent to
-							hand the sheet to. Chrome 149 and up can turn it on at{" "}
-							<code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
-								chrome://flags/#enable-webmcp-testing
-							</code>
-							. The grid works either way.
-						</p>
+						<>
+							<p className="text-xs leading-relaxed text-muted-foreground">
+								This browser has no WebMCP support, so there is no agent
+								to hand the sheet to. The grid works anyway &mdash; it
+								always did.
+							</p>
+							<p className="text-xs leading-relaxed text-muted-foreground">
+								To see the tools work, open this page in the{" "}
+								<b className="font-medium text-foreground">
+									ChatGPT desktop app&rsquo;s built-in browser
+								</b>{" "}
+								and ask it to build something. Chrome 149 and up can
+								switch the API on at{" "}
+								<code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
+									chrome://flags/#enable-webmcp-testing
+								</code>
+								, but a plain Chrome tab has no agent attached to call
+								them.
+							</p>
+						</>
 					)}
 				</div>
 			) : (
