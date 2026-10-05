@@ -48,7 +48,6 @@ export default function Image() {
 					fontSize: 76,
 					fontWeight: 600,
 					lineHeight: 1.1,
-					letterSpacing: -2,
 				}}
 			>
 				A spreadsheet the agent operates directly.
