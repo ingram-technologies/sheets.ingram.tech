@@ -51,6 +51,7 @@ export function LandingCta({
 				size={size}
 				className={cn("group", className)}
 				render={<Link href={AFTER_AUTH} />}
+				nativeButton={false}
 			>
 				{children ?? "Open your spreadsheets"}
 				<ArrowRightIcon className="size-4 transition-transform group-hover:translate-x-0.5" />

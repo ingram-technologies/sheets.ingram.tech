@@ -249,6 +249,7 @@ export function Landing({ signedIn }: { signedIn: boolean }) {
 			<footer className="mx-auto w-full max-w-5xl px-6 pb-10">
 				<div className="flex flex-col items-center gap-2 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:justify-between">
 					<p>
+						{/* oxlint-disable-next-line react/purity -- the year cannot drift between renders in any way a reader would see */}
 						© {new Date().getFullYear()}{" "}
 						<a
 							href="https://ingram.tech"

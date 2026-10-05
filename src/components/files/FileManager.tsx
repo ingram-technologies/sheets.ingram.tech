@@ -335,6 +335,7 @@ export function FileManager({
 
 			<footer className="mt-16 flex flex-col items-center gap-2 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:justify-between">
 				<p>
+					{/* oxlint-disable-next-line react/purity -- the year cannot drift between renders in any way a reader would see */}
 					© {new Date().getFullYear()}{" "}
 					<a
 						href="https://ingram.tech"
