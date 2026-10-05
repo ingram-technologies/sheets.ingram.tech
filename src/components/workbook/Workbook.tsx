@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toaster";
 
 import { loadScratchBytes, saveScratchBytes } from "@/lib/local-workbook";
+import { parseVersionEtag, versionEtag } from "@/lib/version-etag";
 
 import { WorkbookController } from "./controller";
 import { ensureIronCalc, Model } from "./ironcalc";
@@ -34,14 +35,6 @@ import { Toolbar } from "./Toolbar";
 type SaveState = "saved" | "dirty" | "saving" | "retrying" | "failed" | "conflict";
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
-
-/** `"3"` -> 3. Null when the header is missing or not a version ETag. */
-function parseEtag(header: string | null): number | null {
-	if (!header) return null;
-	const match = /^"(\d+)"$/.exec(header.trim());
-	if (!match?.[1]) return null;
-	return Number(match[1]);
-}
 
 /**
  * How often an open tab checks whether something edited this workbook from
@@ -151,7 +144,7 @@ export function Workbook({
 					throw new Error(`failed to load workbook (${response.status})`);
 				const bytes = new Uint8Array(await response.arrayBuffer());
 				if (cancelled) return;
-				version.current = parseEtag(response.headers.get("etag"));
+				version.current = parseVersionEtag(response.headers.get("etag"));
 				const model = Model.from_bytes(bytes, "en");
 				setController(new WorkbookController(model));
 			} catch (error) {
@@ -210,7 +203,7 @@ export function Workbook({
 						"content-type": "application/octet-stream",
 						// Conditional write: the server rejects this if the
 						// workbook moved on (an MCP client wrote) since load.
-						...(known === null ? {} : { "if-match": `"${known}"` }),
+						...(known === null ? {} : { "if-match": versionEtag(known) }),
 					},
 					body: new Blob([bytes.buffer as ArrayBuffer]),
 				});
@@ -262,7 +255,7 @@ export function Workbook({
 				const response = await fetch(`/api/workbooks/${id}/bytes`);
 				if (!response.ok) throw new Error(String(response.status));
 				const bytes = new Uint8Array(await response.arrayBuffer());
-				const nextVersion = parseEtag(response.headers.get("etag"));
+				const nextVersion = parseVersionEtag(response.headers.get("etag"));
 				const model = Model.from_bytes(bytes, "en");
 				const next = new WorkbookController(model);
 

@@ -1,4 +1,5 @@
 import { requireApiUser } from "@/lib/session";
+import { parseVersionEtag, versionEtag } from "@/lib/version-etag";
 import { getWorkbookForEdit, saveWorkbookBytes } from "@/lib/workbooks";
 
 type Params = { params: Promise<{ id: string }> };
@@ -16,19 +17,6 @@ const MAX_BYTES = 32 * 1024 * 1024;
 // silently discard whatever the other did. The version travels as an ETag, and
 // a PUT must carry it back in `If-Match`.
 
-/** The workbook version as a strong ETag: version 3 -> `"3"`. */
-function etag(version: number): string {
-	return `"${version}"`;
-}
-
-/** Parse `If-Match: "3"` back to 3. Null for absent/garbage/`*`. */
-function parseIfMatch(header: string | null): number | null {
-	if (!header) return null;
-	const match = /^"(\d+)"$/.exec(header.trim());
-	if (!match?.[1]) return null;
-	return Number(match[1]);
-}
-
 export async function GET(_request: Request, { params }: Params) {
 	const gate = await requireApiUser();
 	if ("response" in gate) return gate.response;
@@ -40,7 +28,7 @@ export async function GET(_request: Request, { params }: Params) {
 			"content-type": "application/octet-stream",
 			"cache-control": "no-store",
 			// The client holds onto this and sends it back on PUT.
-			etag: etag(found.meta.version),
+			etag: versionEtag(found.meta.version),
 		},
 	});
 }
@@ -53,7 +41,7 @@ export async function PUT(request: Request, { params }: Params) {
 	// Refusing an unconditional write is the point: a client that does not
 	// track the version cannot participate safely, and failing loudly here is
 	// far cheaper than diagnosing lost edits later.
-	const expectedVersion = parseIfMatch(request.headers.get("if-match"));
+	const expectedVersion = parseVersionEtag(request.headers.get("if-match"));
 	if (expectedVersion === null) {
 		return Response.json(
 			{ error: "if-match required", detail: "PUT must carry the ETag from GET." },
@@ -83,10 +71,10 @@ export async function PUT(request: Request, { params }: Params) {
 		// can re-read the bytes and reapply rather than guess.
 		return Response.json(
 			{ error: "version conflict", meta: result.meta },
-			{ status: 412, headers: { etag: etag(result.meta.version) } },
+			{ status: 412, headers: { etag: versionEtag(result.meta.version) } },
 		);
 	}
 	return Response.json(result.meta, {
-		headers: { etag: etag(result.meta.version) },
+		headers: { etag: versionEtag(result.meta.version) },
 	});
 }
