@@ -47,7 +47,9 @@ export function ConsentForm({
 				<p className="text-sm text-muted-foreground">
 					It will be able to read, create and edit every workbook in your
 					account, <span className="text-foreground">{email}</span>
-					{staysConnected ? ", and keep it without asking again." : "."}
+					{staysConnected
+						? ", until you disconnect it under Connected apps in your account menu."
+						: "."}
 				</p>
 				{clientUri ? (
 					<p className="text-xs break-all text-muted-foreground">
