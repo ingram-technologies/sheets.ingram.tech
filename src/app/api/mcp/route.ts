@@ -1,6 +1,6 @@
-import { withMcpAuth } from "better-auth/plugins";
+import { requireMcpAuth } from "@better-auth/mcp";
 
-import { auth } from "@/lib/auth";
+import { auth, mcpResource } from "@/lib/auth";
 import { handleRpc } from "@/lib/mcp/server";
 
 /**
@@ -16,13 +16,14 @@ import { handleRpc } from "@/lib/mcp/server";
  * workbook is open — travels in each tool call's `workbook_id` instead, so
  * concurrent clients and retries need no coordination.
  *
- * `withMcpAuth` resolves the bearer token to an OAuth grant and answers 401
- * with the `WWW-Authenticate` challenge MCP clients follow to discover the
- * authorization server. The user id comes from that grant and nowhere else —
- * never from the request body — which is what keeps every tool owner-scoped.
+ * `requireMcpAuth` verifies the bearer token (a JWT bound to this resource)
+ * against our JWKS and answers 401 with the `WWW-Authenticate` challenge MCP
+ * clients follow to discover the authorization server. The user id is the
+ * token's `sub` and comes from nowhere else — never from the request body —
+ * which is what keeps every tool owner-scoped.
  */
 
-export const POST = withMcpAuth(auth, async (request, session) => {
+const handler = async (request: Request, userId: string): Promise<Response> => {
 	let message: unknown;
 	try {
 		message = await request.json();
@@ -37,13 +38,24 @@ export const POST = withMcpAuth(auth, async (request, session) => {
 		);
 	}
 
-	const response = await handleRpc(message, session.userId);
+	const response = await handleRpc(message, userId);
 	// A JSON-RPC notification gets no reply body; 202 says "accepted, nothing
 	// to say" without inventing a result the client would try to match to a
 	// request id it never sent.
 	if (response === null) return new Response(null, { status: 202 });
 	return Response.json(response);
-});
+};
+
+export const POST = requireMcpAuth(
+	auth,
+	(request, claims) =>
+		// A verified token always names its user; refuse one that somehow
+		// does not rather than run tools for nobody.
+		typeof claims.sub === "string"
+			? handler(request, claims.sub)
+			: Response.json({ error: "token has no subject" }, { status: 401 }),
+	{ resource: mcpResource },
+);
 
 /**
  * MCP clients probe with GET to discover whether the endpoint upgrades to a

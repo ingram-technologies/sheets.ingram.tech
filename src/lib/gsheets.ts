@@ -82,8 +82,15 @@ export async function getGoogleToken(
 	let accessToken: string;
 	let scopes: string[];
 	try {
+		// Better Auth names the account by its row id, not by provider, so
+		// find the user's Google row first.
+		const { internalAdapter } = await auth.$context;
+		const google = (await internalAdapter.findAccounts(userId)).find(
+			(account) => account.providerId === "google",
+		);
+		if (!google) throw new Error("no google account");
 		({ accessToken, scopes } = await auth.api.getAccessToken({
-			body: { providerId: "google", userId },
+			body: { accountId: google.id, userId },
 		}));
 	} catch {
 		throw new GsheetsError({ kind: "no_account" });

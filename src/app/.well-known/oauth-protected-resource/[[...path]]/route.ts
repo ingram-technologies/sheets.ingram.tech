@@ -1,5 +1,3 @@
-import { oAuthProtectedResourceMetadata } from "better-auth/plugins";
-
 import { auth } from "@/lib/auth";
 
 /**
@@ -10,8 +8,7 @@ import { auth } from "@/lib/auth";
  * *inserting* the well-known segment before the resource's own path, so the
  * URL for `https://sheets.ingram.tech/api/mcp` is
  * `/.well-known/oauth-protected-resource/api/mcp`, while older clients fetch
- * the bare `/.well-known/oauth-protected-resource`. Both forms land here and
- * get the same document, so discovery works whichever revision the client
- * implements.
+ * the bare `/.well-known/oauth-protected-resource`. The `mcp` plugin answers
+ * both forms when the request reaches Better Auth's handler.
  */
-export const GET = oAuthProtectedResourceMetadata(auth);
+export const GET = (request: Request) => auth.handler(request);

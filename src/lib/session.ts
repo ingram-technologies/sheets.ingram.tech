@@ -2,8 +2,15 @@ import { createAuthHelpers } from "@ingram-tech/nk-auth/server";
 
 import { auth } from "@/lib/auth";
 
+// `chainCheck: false`: nk-auth's check that its migration chain is applied
+// finds the chain's journal through `import.meta.url`, which Next's bundler
+// rewrites to a path that does not exist, so the first session read on every
+// page threw. Bundling nk-auth externally instead breaks its middleware's
+// import of `next/server`. Better Auth (1.7.5+) runs its own check against
+// the live schema on the first auth call and refuses loudly when a table or
+// column is missing, which is the failure the chain check exists to catch.
 export const { getSession, getUser, requireUser, redirectIfAuthenticated } =
-	createAuthHelpers(auth);
+	createAuthHelpers(auth, { chainCheck: false });
 
 /**
  * Session gate for API routes. Returns either a 401 Response to hand straight

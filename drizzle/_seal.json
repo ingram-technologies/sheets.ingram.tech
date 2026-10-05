@@ -11,6 +11,7 @@
 		"0007_workbook_last_activity": "141ffd2735576895334b3503e8081f47de35a7733ebe5254ca77e8a1be02f58e",
 		"0008_mcp_oauth": "f4ca5143601bc3bc34d7258dad1faf773be5cfe584aa487dcff99362b3e35bc4",
 		"0009_inference_credential": "f7981a99204e09cb4a193d717c0417b8b63ffc4e599c514303485767dae3b8fc",
-		"0010_inference_credential_owner": "dc094c5bf8578d40e125828b1acd480b5d921d3c1ab8482b5b573bd90d931303"
+		"0010_inference_credential_owner": "dc094c5bf8578d40e125828b1acd480b5d921d3c1ab8482b5b573bd90d931303",
+		"0011_mcp_oauth_provider": "f3e8c61ccbbb5c6c2e9bfb2724b1389a457fc626ee3815eaf70112ec6c984721"
 	}
 }
