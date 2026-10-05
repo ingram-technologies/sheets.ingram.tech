@@ -1,6 +1,7 @@
 import { requireMcpAuth } from "@better-auth/mcp";
 
 import { auth, mcpResource } from "@/lib/auth";
+import { hasConsent } from "@/lib/connected-apps";
 import { handleRpc } from "@/lib/mcp/server";
 
 /**
@@ -22,6 +23,12 @@ import { handleRpc } from "@/lib/mcp/server";
  * token's `sub` and comes from nowhere else — never from the request body —
  * which is what keeps every tool owner-scoped.
  */
+
+/** Where a client re-discovers how to sign in (RFC 9728 path form). */
+const RESOURCE_METADATA = (() => {
+	const url = new URL(mcpResource);
+	return `${url.origin}/.well-known/oauth-protected-resource${url.pathname}`;
+})();
 
 const handler = async (request: Request, userId: string): Promise<Response> => {
 	let message: unknown;
@@ -48,12 +55,30 @@ const handler = async (request: Request, userId: string): Promise<Response> => {
 
 export const POST = requireMcpAuth(
 	auth,
-	(request, claims) =>
-		// A verified token always names its user; refuse one that somehow
-		// does not rather than run tools for nobody.
-		typeof claims.sub === "string"
-			? handler(request, claims.sub)
-			: Response.json({ error: "token has no subject" }, { status: 401 }),
+	async (request, claims) => {
+		// A verified token always names its user and its app; refuse one that
+		// somehow does not rather than run tools for nobody.
+		const userId = claims.sub;
+		const clientId = claims.azp ?? claims.client_id;
+		if (typeof userId !== "string" || typeof clientId !== "string") {
+			return Response.json({ error: "token has no subject" }, { status: 401 });
+		}
+		// The signature says the token was issued; only the consent says it is
+		// still wanted. Disconnecting an app in Connected apps removes the
+		// consent, and this is where that bites (see lib/connected-apps).
+		if (!(await hasConsent(userId, clientId))) {
+			return Response.json(
+				{ error: "this app was disconnected" },
+				{
+					status: 401,
+					headers: {
+						"www-authenticate": `Bearer error="invalid_token", resource_metadata="${RESOURCE_METADATA}"`,
+					},
+				},
+			);
+		}
+		return handler(request, userId);
+	},
 	{ resource: mcpResource },
 );
 

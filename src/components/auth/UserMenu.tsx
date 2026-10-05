@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyRoundIcon, LogOutIcon } from "lucide-react";
+import { KeyRoundIcon, LogOutIcon, PlugIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth-client";
 
+import { ConnectedAppsDialog } from "./ConnectedAppsDialog";
+
 export function UserMenu({
 	onOpenInferenceSettings,
 }: {
@@ -23,6 +25,7 @@ export function UserMenu({
 	const router = useRouter();
 	const { data: session, isPending } = authClient.useSession();
 	const [imageFailed, setImageFailed] = useState(false);
+	const [appsOpen, setAppsOpen] = useState(false);
 
 	// Reserve the slot while the session resolves. Returning null shifted the
 	// whole header the moment it arrived, because the save-state text next to
@@ -38,59 +41,70 @@ export function UserMenu({
 	const avatar = !imageFailed && user.image ? user.image : null;
 
 	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger
-				aria-label="Account"
-				// focus-visible, not just hover: this is a bare trigger rather
-				// than a Button, so it inherited none of button.tsx's focus
-				// styles and was an invisible tab stop.
-				className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-xs font-medium text-primary hover:ring-2 hover:ring-ring/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-			>
-				{avatar ? (
-					// Plain <img>: Google avatar URLs are tiny and next/image's
-					// remote-domain allowlist isn't worth configuring for them.
-					// width/height reserve the box (CLS), and no-referrer avoids
-					// Google's CDN 403ing on the Referer header.
-					<img
-						src={avatar}
-						alt=""
-						width={28}
-						height={28}
-						referrerPolicy="no-referrer"
-						className="size-full object-cover"
-						// A dead avatar URL used to leave an empty coral circle;
-						// fall back to the initial instead.
-						onError={() => setImageFailed(true)}
-					/>
-				) : (
-					initial
-				)}
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end" className="min-w-52">
-				<div className="px-2 py-1.5 text-sm">
-					<p className="truncate font-medium">{user.name}</p>
-					<p className="truncate text-xs text-muted-foreground">
-						{user.email}
-					</p>
-				</div>
-				<DropdownMenuSeparator />
-				{onOpenInferenceSettings ? (
-					<DropdownMenuItem onClick={onOpenInferenceSettings}>
-						<KeyRoundIcon className="size-4" />
-						Ingram Cloud
-					</DropdownMenuItem>
-				) : null}
-				<DropdownMenuItem
-					onClick={() =>
-						void authClient.signOut({
-							fetchOptions: { onSuccess: () => router.push("/login") },
-						})
-					}
+		<>
+			<DropdownMenu>
+				<DropdownMenuTrigger
+					aria-label="Account"
+					// focus-visible, not just hover: this is a bare trigger rather
+					// than a Button, so it inherited none of button.tsx's focus
+					// styles and was an invisible tab stop.
+					className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-xs font-medium text-primary hover:ring-2 hover:ring-ring/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
 				>
-					<LogOutIcon className="size-4" />
-					Sign out
-				</DropdownMenuItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
+					{avatar ? (
+						// Plain <img>: Google avatar URLs are tiny and next/image's
+						// remote-domain allowlist isn't worth configuring for them.
+						// width/height reserve the box (CLS), and no-referrer avoids
+						// Google's CDN 403ing on the Referer header.
+						<img
+							src={avatar}
+							alt=""
+							width={28}
+							height={28}
+							referrerPolicy="no-referrer"
+							className="size-full object-cover"
+							// A dead avatar URL used to leave an empty coral circle;
+							// fall back to the initial instead.
+							onError={() => setImageFailed(true)}
+						/>
+					) : (
+						initial
+					)}
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end" className="min-w-52">
+					<div className="px-2 py-1.5 text-sm">
+						<p className="truncate font-medium">{user.name}</p>
+						<p className="truncate text-xs text-muted-foreground">
+							{user.email}
+						</p>
+					</div>
+					<DropdownMenuSeparator />
+					{onOpenInferenceSettings ? (
+						<DropdownMenuItem onClick={onOpenInferenceSettings}>
+							<KeyRoundIcon className="size-4" />
+							Ingram Cloud
+						</DropdownMenuItem>
+					) : null}
+					<DropdownMenuItem onClick={() => setAppsOpen(true)}>
+						<PlugIcon className="size-4" />
+						Connected apps
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						onClick={() =>
+							void authClient.signOut({
+								fetchOptions: {
+									onSuccess: () => router.push("/login"),
+								},
+							})
+						}
+					>
+						<LogOutIcon className="size-4" />
+						Sign out
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
+			{/* Outside the menu: the menu unmounts its content when it closes,
+		    and the dialog must outlive the click that opened it. */}
+			<ConnectedAppsDialog open={appsOpen} onOpenChange={setAppsOpen} />
+		</>
 	);
 }
