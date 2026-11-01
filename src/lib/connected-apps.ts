@@ -7,8 +7,8 @@ import { pool } from "./db";
  * throw one out.
  *
  * An app is "connected" while the user's consent for it exists. Better Auth
- * keeps the grant in its own tables (outside the drizzle schema, see
- * drizzle/0011), so this reads them with plain SQL, and every query takes the
+ * keeps the grant in its own tables (nk-auth's chain, outside the drizzle
+ * schema), so this reads them with plain SQL, and every query takes the
  * owner like lib/workbooks does: someone else's app is simply not found.
  *
  * Disconnecting has to do more than Better Auth's own `delete-consent`, which

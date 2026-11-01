@@ -42,7 +42,7 @@ the delta echo, the engine pin, or presence.
   `chrome://flags/#enable-webmcp-testing`, in production the token in
   `NEXT_PUBLIC_WEBMCP_ORIGIN_TRIAL`.
 - **Claude Code connects over MCP** at `POST /api/mcp` (`src/lib/mcp/`),
-  authenticated by OAuth (Better Auth's `mcp` plugin), executing server-side
+  authenticated by OAuth (nk-auth's `mcpAuthServer` preset), executing server-side
   against sheetkit-wasm. An open tab polls and shows those edits as they land.
 - Google sign-in via Better Auth / `@ingram-tech/nk-auth` (`src/lib/auth.ts`,
   mounted at `/auth`). **Workbooks are per-owner**: `workbook.user_id` is NOT

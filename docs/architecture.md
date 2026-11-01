@@ -167,14 +167,15 @@ every call loads current bytes, acts, persists. An agent cannot leave a workbook
 dirty or hold a stale session. The verbs stay inside `sheet_exec`'s command
 language, which is what keeps the surface small enough to hold in view.
 
-**Auth is OAuth**, via Better Auth's `mcp` plugin (`src/lib/auth.ts`), not an
+**Auth is OAuth**, via nk-auth's `mcpAuthServer` preset over Better Auth's `mcp`
+plugin (`src/lib/auth.ts`), not an
 API-key table. An MCP client is a third-party program acting for the user, which
 is the case OAuth exists for: revocation is per-client, and there is no
 permanent key to leak. Claude Code registers itself dynamically, so nothing is
 configured per client. Discovery documents are re-exposed at the **origin root**
 (`src/app/.well-known/…`) because that is where clients look — our Better Auth
-mounts at `/auth`, not the root. The protected-resource route is an optional
-catch-all so both RFC 9728 path forms resolve.
+mounts at `/auth`, not the root. Each is an optional catch-all over
+`mcpDiscovery(auth)`, so both path forms resolve.
 
 The user id comes from the OAuth grant and never from the request body, so the
 type-level ownership model in `src/lib/workbooks.ts` applies unchanged: someone
@@ -332,9 +333,9 @@ see the nk-dev guide).
 Every workbook has exactly one owner: `workbook.user_id`, NOT NULL, FK to Better
 Auth's `user` table with `ON DELETE cascade` (so deleting an account takes its
 workbooks with it — which is also what erasure requests need). Better Auth's
-tables are raw SQL with deny-all RLS and are deliberately absent from the
-drizzle schema, so that FK is hand-written in `drizzle/0004_workbook_owner.sql`
-rather than emitted by drizzle-kit.
+tables come from nk-auth's migration chain and are deliberately absent from the
+drizzle schema, so that FK lives in `drizzle/0000_baseline.sql` rather than
+being emitted by drizzle-kit.
 
 The isolation model is a type-level one, not a convention:
 

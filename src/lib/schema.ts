@@ -34,10 +34,10 @@ export const workbooks = pgTable(
 			.default(sql`uuidv7()`),
 		// Owner. Every read and write in lib/workbooks.ts is scoped by this —
 		// there is no unscoped query, by construction. Better Auth's `user`
-		// table is raw SQL (drizzle/0001) and carries deny-all RLS, so it is
+		// table comes from nk-auth's chain and carries deny-all RLS, so it is
 		// deliberately NOT a drizzle table: declaring it here would make
 		// drizzle-kit try to manage Better Auth's schema. The FK
-		// (ON DELETE cascade) is therefore hand-written in drizzle/0004.
+		// (ON DELETE cascade) is therefore in drizzle/0000_baseline.
 		userId: text("user_id").notNull(),
 		name: text("name").notNull(),
 		bytes: bytea("bytes").notNull(),
@@ -84,7 +84,7 @@ export const workbooks = pgTable(
  * Sheets holds no inference key of its own: no row → no agent for that user.
  *
  * `user_id` is Better Auth's id; like `workbook.user_id` the FK to `user` is
- * hand-written (drizzle/0010) because Better Auth's tables are deliberately
+ * in drizzle/0000_baseline because Better Auth's tables are deliberately
  * not in this schema.
  */
 export const inferenceCredential = pgTable("inference_credential", {

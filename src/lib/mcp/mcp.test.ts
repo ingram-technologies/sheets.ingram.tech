@@ -54,7 +54,7 @@ beforeEach(async () => {
 	// CASCADE takes workbooks with their owners, so this is the whole reset.
 	await execute(`truncate table "user" cascade`);
 	// workbook.user_id is a real FK to Better Auth's `user` table (see
-	// drizzle/0004), so the owners have to exist before anything can own
+	// drizzle/0000_baseline), so the owners have to exist before anything can own
 	// anything. Raw SQL because those tables are deliberately outside the
 	// drizzle schema.
 	for (const [id, email] of [

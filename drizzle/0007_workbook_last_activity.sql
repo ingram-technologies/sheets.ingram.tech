@@ -1,1 +1,0 @@
-ALTER TABLE "workbook" ADD COLUMN "last_activity" jsonb;
