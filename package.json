@@ -31,7 +31,7 @@
 		"@better-auth/oauth-provider": "1.7.15",
 		"@better-auth/passkey": "1.7.15",
 		"@ingram-cloud/ai-sdk": "^3.0.1",
-		"@ingram-cloud/sdk": "^1.16.0",
+		"@ingram-cloud/sdk": "^2.6.0",
 		"@ingram-tech/nk-auth": "^0.22.1",
 		"@ingram-tech/nk-db": "^2.4.0",
 		"@ironcalc/wasm": "file:vendor/ironcalc-wasm",
