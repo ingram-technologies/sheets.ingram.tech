@@ -3,7 +3,7 @@ import { createAuthHelpers } from "@ingram-tech/nk-auth/server";
 import { auth } from "@/lib/auth";
 import { ids } from "@/lib/ids";
 
-// Session user ids in public form (`usr_…`), as the userIdColumn reads them.
+// Session user ids in public form (`usr_…`), as idColumn("user") reads them.
 export const { getSession, getUser, requireUser, redirectIfAuthenticated } =
 	createAuthHelpers(auth, { ids: { user: ids.user } });
 

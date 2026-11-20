@@ -71,7 +71,7 @@ describe("public user ids", () => {
 		expect(session.session.userId).toBe(session.user.id);
 	});
 
-	it("stores the raw uuid, finds it by usr_ id and refuses a raw one", async () => {
+	it("stores the raw uuid, finds it by usr_ id, auth tables refuse a raw one", async () => {
 		const usr = ids.user.encode(RAW);
 		const created = await workbooks.createWorkbook({
 			userId: usr,
@@ -85,8 +85,8 @@ describe("public user ids", () => {
 		const listed = await workbooks.listWorkbooks(usr);
 		expect(listed.map((w) => w.id)).toEqual([created.id]);
 		expect(await connectedApps.listConnectedApps(usr)).toEqual([]);
-		// One form: a raw uuid is refused before it reaches a query.
-		await expect(workbooks.listWorkbooks(RAW)).rejects.toThrow();
+		// Better Auth's tables are reached through authUserId, which takes
+		// only the public form.
 		await expect(connectedApps.hasConsent(RAW, "any-client")).rejects.toThrow();
 	});
 });

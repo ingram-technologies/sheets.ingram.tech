@@ -1,9 +1,4 @@
-import {
-	authBasePath,
-	authSecret,
-	publicSessionIds,
-	uuidGenerateId,
-} from "@ingram-tech/nk-auth";
+import { authBasePath, authSecret, publicSessionIds } from "@ingram-tech/nk-auth";
 import { mcpAuthServer } from "@ingram-tech/nk-auth/mcp";
 import { betterAuth } from "better-auth";
 import { jwt } from "better-auth/plugins";
@@ -40,7 +35,7 @@ export const auth = betterAuth({
 	secret: authSecret(),
 	baseURL,
 	basePath: authBasePath,
-	advanced: { database: { generateId: uuidGenerateId } },
+	advanced: { database: { generateId: "uuid" } },
 	socialProviders: {
 		google: {
 			clientId: process.env.GOOGLE_CLIENT_ID ?? "",

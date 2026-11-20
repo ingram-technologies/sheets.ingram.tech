@@ -1,4 +1,5 @@
 import { requireMcpAuth } from "@better-auth/mcp";
+import { publicUserId } from "@ingram-tech/nk-auth";
 
 import { auth, mcpResource } from "@/lib/auth";
 import { hasConsent } from "@/lib/connected-apps";
@@ -66,8 +67,7 @@ export const POST = requireMcpAuth(
 		}
 		// Better Auth owns `sub` and keeps it a raw uuid; skin it once here so
 		// everything inward holds the public `usr_…` id (nk-auth README).
-		// oxlint-disable-next-line nextkit/no-id-codec-in-app-code -- the OAuth sub is the one raw id entering the app
-		const userId = ids.user.encode(sub);
+		const userId = publicUserId(sub, ids);
 		// The signature says the token was issued; only the consent says it is
 		// still wanted. Disconnecting an app in Connected apps removes the
 		// consent, and this is where that bites (see lib/connected-apps).

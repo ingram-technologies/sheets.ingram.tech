@@ -13,8 +13,8 @@
         "@better-auth/passkey": "1.7.15",
         "@ingram-cloud/ai-sdk": "^3.0.1",
         "@ingram-cloud/sdk": "^2.6.0",
-        "@ingram-tech/nk-auth": "^0.26.1",
-        "@ingram-tech/nk-db": "^2.6.0",
+        "@ingram-tech/nk-auth": "^0.28.0",
+        "@ingram-tech/nk-db": "^2.6.1",
         "@ingram-tech/nk-seo": "^0.11.0",
         "@ironcalc/wasm": "file:vendor/ironcalc-wasm",
         "ai": "^7.0.177",
@@ -296,9 +296,9 @@
 
     "@ingram-cloud/sdk": ["@ingram-cloud/sdk@2.6.0", "", { "dependencies": { "zod": "^4.5.4" } }, "sha512-dzytvtTuDEML4MR549fBfDDit7hWZTK0dbVyNtVUApUeZGG9hLDdxIYoUKeyh1bpeCdp2A51PZoxtXmDjMyvOw=="],
 
-    "@ingram-tech/nk-auth": ["@ingram-tech/nk-auth@0.26.1", "", { "dependencies": { "@ingram-tech/nk-db": "^2.6.0", "bcrypt": "^6.0.0", "jose": "^6.2.12", "uqr": "^0.1.3", "zod": "^4.6.4" }, "peerDependencies": { "@better-auth/cimd": "1.7.15", "@better-auth/mcp": "1.7.15", "@better-auth/oauth-provider": "1.7.15", "@better-auth/passkey": "1.7.15", "better-auth": "1.7.15", "next": "^15.0.0 || ^16.0.0", "pg": "^8.13.0", "react": "^18.0.0 || ^19.0.0" }, "optionalPeers": ["@better-auth/cimd", "@better-auth/mcp", "@better-auth/oauth-provider", "@better-auth/passkey", "next", "pg", "react"] }, "sha512-8m0o3NBsq9r4bE0uGslKnD4tFi2b5rNefoJlQ6DD2DmmdfDFvjLyXDyeoyjCkSilfpANKAwJC44/GKm1zW+8vw=="],
+    "@ingram-tech/nk-auth": ["@ingram-tech/nk-auth@0.28.0", "", { "dependencies": { "@ingram-tech/nk-db": "^2.6.1", "bcrypt": "^6.0.0", "jose": "^6.2.12", "uqr": "^0.1.3", "zod": "^4.6.4" }, "peerDependencies": { "@better-auth/cimd": "1.7.15", "@better-auth/mcp": "1.7.15", "@better-auth/oauth-provider": "1.7.15", "@better-auth/passkey": "1.7.15", "better-auth": "1.7.15", "next": "^15.0.0 || ^16.0.0", "pg": "^8.13.0", "react": "^18.0.0 || ^19.0.0" }, "optionalPeers": ["@better-auth/cimd", "@better-auth/mcp", "@better-auth/oauth-provider", "@better-auth/passkey", "next", "pg", "react"] }, "sha512-+PGqWksxCGmLQn9/Hhs+OrAtYuIMXZb9Yk+5cBUAsbeY7w0ANUQ882lFqLuwdmn3qaFUZKPla848XPu33j/EFg=="],
 
-    "@ingram-tech/nk-db": ["@ingram-tech/nk-db@2.6.0", "", { "dependencies": { "id758": "^1.1.0", "zod": "^4.6.4" }, "peerDependencies": { "@electric-sql/pglite": ">=0.5.0", "@electric-sql/pglite-socket": ">=0.2.11", "drizzle-orm": ">=0.44.0", "pg": "^8.13.0" }, "optionalPeers": ["@electric-sql/pglite", "@electric-sql/pglite-socket"], "bin": { "nk-pg-migrate": "dist/migrate-bin.js", "nk-pglite-dev": "dist/pglite/dev.js", "nk-pg-fingerprint": "dist/fingerprint-bin.js" } }, "sha512-TzM0mEfQNWffH4xKGgGouoX1Y+s8+8sVc73bc5RxuS/0e1+qOedG6T+229Qkr0YxvESSw00QHHFER82x4NHXrg=="],
+    "@ingram-tech/nk-db": ["@ingram-tech/nk-db@2.6.1", "", { "dependencies": { "id758": "^1.1.0", "zod": "^4.6.4" }, "peerDependencies": { "@electric-sql/pglite": ">=0.5.0", "@electric-sql/pglite-socket": ">=0.2.11", "drizzle-orm": ">=0.44.0", "pg": "^8.13.0" }, "optionalPeers": ["@electric-sql/pglite", "@electric-sql/pglite-socket"], "bin": { "nk-pg-migrate": "dist/migrate-bin.js", "nk-pglite-dev": "dist/pglite/dev.js", "nk-pg-fingerprint": "dist/fingerprint-bin.js" } }, "sha512-5PimuFhiDP4VeNzXdVpNqzGLVNEHEPhL0rO3Fr4zRHXWmKGcrI8Gl5BinSihDXo+q5By6e3M/ad9HUy9+kKRUw=="],
 
     "@ingram-tech/nk-dev": ["@ingram-tech/nk-dev@0.26.0", "", { "dependencies": { "@ast-grep/cli": "^0.51.0", "@testing-library/dom": "^10.4.2", "@testing-library/jest-dom": "^7.0.1", "@typescript/native": "npm:typescript@^7.0.2", "jsdom": "^30.1.3", "knip": "^6.43.0", "oxfmt": "^0.75.0", "oxlint": "^1.90.0", "oxlint-tsgolint": "^7.0.2005", "typescript": "npm:@typescript/typescript6@^6.0.2", "vitest": "^5.0.5" }, "bin": { "nk": "bin/nk.js", "nextkit-format-staged": "bin/format-staged.mjs" } }, "sha512-PEjTXFooKZSEItxAQsv41Qp2RikUwe3nIwBJXqqf87A4qhjHd0QBi0C7O4dH8D5e4TJeNV+Gt379tNghOdcP0A=="],
 

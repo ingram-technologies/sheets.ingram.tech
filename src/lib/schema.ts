@@ -10,7 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import type { WorkbookActivity } from "./activity";
-import { idColumn, userIdColumn } from "./ids";
+import { idColumn } from "./ids";
 
 /**
  * Workbook bytes are the IronCalc native serialization (`Model.toBytes()`),
@@ -38,7 +38,7 @@ export const workbooks = pgTable(
 		// deliberately NOT a drizzle table: declaring it here would make
 		// drizzle-kit try to manage Better Auth's schema. The FK
 		// (ON DELETE cascade) is therefore in drizzle/0000_baseline.
-		userId: userIdColumn("user_id").notNull(),
+		userId: idColumn("user")("user_id").notNull(),
 		name: text("name").notNull(),
 		bytes: bytea("bytes").notNull(),
 		// Optimistic-concurrency counter, bumped on every bytes write.
@@ -88,7 +88,7 @@ export const workbooks = pgTable(
  * not in this schema.
  */
 export const inferenceCredential = pgTable("inference_credential", {
-	userId: userIdColumn("user_id").primaryKey(),
+	userId: idColumn("user")("user_id").primaryKey(),
 	/** AES-256-GCM under SHEETS_CREDENTIALS_KEY (`src/lib/secrets.ts`). */
 	tokenCiphertext: text("token_ciphertext").notNull(),
 	/** The token's tail — the only part ever shown again. */

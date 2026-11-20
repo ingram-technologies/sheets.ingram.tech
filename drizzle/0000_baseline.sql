@@ -1,9 +1,11 @@
--- Baseline, squashed 2026-11-01 from 0000_workbooks..0011_mcp_oauth_provider.
+-- Baseline, squashed 2026-11-20 from 0000_baseline (2026-11-01), after
+-- nk-auth's 0005_uuid_ids turned Better Auth's ids and every column FK'd to
+-- them (workbook.user_id, inference_credential.user_id) into uuid.
 --
 -- The body is a `pg_dump --schema-only --no-owner --schema=public` of
--- production with the full old chain applied, excluding every table nk-auth's
--- chain owns (user, session, account, verification, jwks, passkey and the
--- oauth* provider tables from its 0004). That chain runs first, here and in
+-- production with the full old chain and nk-auth 0001..0005 applied, excluding
+-- every table nk-auth's chain owns (user, session, account, verification, jwks,
+-- passkey and the oauth* provider tables). That chain runs first, here and in
 -- every harness, so this file holds the app's own tables only.
 --
 -- Transforms: preamble SETs, psql \restrict lines and the public schema's
@@ -14,7 +16,7 @@ SET check_function_bodies = false;
 --> statement-breakpoint
 -- Name: inference_credential; Type: TABLE; Schema: public; Owner: -
 CREATE TABLE public.inference_credential (
-    user_id text NOT NULL,
+    user_id uuid NOT NULL,
     token_ciphertext text NOT NULL,
     token_hint text NOT NULL,
     source text NOT NULL,
@@ -36,7 +38,7 @@ CREATE TABLE public.workbook (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     id uuid DEFAULT uuidv7() CONSTRAINT workbook_id_v7_not_null NOT NULL,
     google_spreadsheet_id text,
-    user_id text NOT NULL,
+    user_id uuid NOT NULL,
     deleted_at timestamp with time zone,
     version integer DEFAULT 1 NOT NULL,
     last_activity jsonb

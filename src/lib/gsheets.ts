@@ -1,7 +1,8 @@
+import { authUserId } from "@ingram-tech/nk-auth";
 import { z } from "zod";
 
 import { auth } from "@/lib/auth";
-import { authUserId } from "@/lib/ids";
+import { ids } from "@/lib/ids";
 import {
 	DRIVE_FILE_SCOPE,
 	GOOGLE_SCOPE_MISSING,
@@ -86,12 +87,12 @@ export async function getGoogleToken(
 		// Better Auth names the account by its row id, not by provider, so
 		// find the user's Google row first.
 		const { internalAdapter } = await auth.$context;
-		const google = (await internalAdapter.findAccounts(authUserId(userId))).find(
-			(account) => account.providerId === "google",
-		);
+		const google = (
+			await internalAdapter.findAccounts(authUserId(userId, ids))
+		).find((account) => account.providerId === "google");
 		if (!google) throw new Error("no google account");
 		({ accessToken, scopes } = await auth.api.getAccessToken({
-			body: { accountId: google.id, userId: authUserId(userId) },
+			body: { accountId: google.id, userId: authUserId(userId, ids) },
 		}));
 	} catch {
 		throw new GsheetsError({ kind: "no_account" });

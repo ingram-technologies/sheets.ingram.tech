@@ -1,6 +1,6 @@
 {
 	"$comment": "sha256 of each migration file at the time it was sealed. Applied migrations are immutable: if a hash here stops matching, the file was edited after it ran and every database that already applied it has drifted. Regenerate with `nk migrations --reseal` ONLY as part of a deliberate squash.",
 	"migrations": {
-		"0000_baseline": "d34d5f5e254631def2bd1ff9b1b1cdac03a5a66dc9bb25b60f0b2d5f398774a0"
+		"0000_baseline": "d8e07d4661dd2645e17cbd5839921ed2f46691fa95ce31150673911dbc5d0e21"
 	}
 }

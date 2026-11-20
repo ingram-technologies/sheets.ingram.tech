@@ -1,7 +1,8 @@
+import { authUserId } from "@ingram-tech/nk-auth";
 import { z } from "zod";
 
 import { pool } from "./db";
-import { authUserId } from "./ids";
+import { ids } from "./ids";
 
 /**
  * The programs a user has let into their workbooks over MCP, and the way to
@@ -56,7 +57,7 @@ export async function listConnectedApps(userId: string): Promise<ConnectedApp[]>
 		  where c."userId" = $1
 		  group by c."clientId", cl.name, cl.uri
 		  order by "connectedAt" desc`,
-		[authUserId(userId)],
+		[authUserId(userId, ids)],
 	);
 	return z
 		.array(rowSchema)
@@ -78,16 +79,16 @@ export async function disconnectApp(
 		await client.query("begin");
 		const consents = await client.query(
 			`delete from "oauthConsent" where "userId" = $1 and "clientId" = $2`,
-			[authUserId(userId), clientId],
+			[authUserId(userId, ids), clientId],
 		);
 		// Access tokens first: they reference the refresh token they came from.
 		await client.query(
 			`delete from "oauthAccessToken" where "userId" = $1 and "clientId" = $2`,
-			[authUserId(userId), clientId],
+			[authUserId(userId, ids), clientId],
 		);
 		await client.query(
 			`delete from "oauthRefreshToken" where "userId" = $1 and "clientId" = $2`,
-			[authUserId(userId), clientId],
+			[authUserId(userId, ids), clientId],
 		);
 		await client.query("commit");
 		return (consents.rowCount ?? 0) > 0;
@@ -103,7 +104,7 @@ export async function disconnectApp(
 export async function hasConsent(userId: string, clientId: string): Promise<boolean> {
 	const { rowCount } = await pool.query(
 		`select 1 from "oauthConsent" where "userId" = $1 and "clientId" = $2 limit 1`,
-		[authUserId(userId), clientId],
+		[authUserId(userId, ids), clientId],
 	);
 	return (rowCount ?? 0) > 0;
 }
