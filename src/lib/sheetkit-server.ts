@@ -41,8 +41,18 @@ const WASM_FILE = "sheetkit_wasm_bg.wasm";
  */
 function wasmCandidates(): string[] {
 	return [
-		join(process.cwd(), "vendor", "sheetkit-wasm", WASM_FILE),
-		join(process.cwd(), "node_modules", "sheetkit-wasm", WASM_FILE),
+		join(
+			/* turbopackIgnore: true */ process.cwd(),
+			"vendor",
+			"sheetkit-wasm",
+			WASM_FILE,
+		),
+		join(
+			/* turbopackIgnore: true */ process.cwd(),
+			"node_modules",
+			"sheetkit-wasm",
+			WASM_FILE,
+		),
 	];
 }
 
