@@ -348,9 +348,9 @@ The isolation model is a type-level one, not a convention:
 - User ids are `usr_…` everywhere the browser or an outside program sees them
   (the session, `get-session`, the Ingram Cloud principal); Better Auth's tables
   keep the raw uuid as `text`. `userIdColumn` (`src/lib/ids.ts`) converts at
-  the column, `authUserId` for Better Auth's adapter and its OAuth tables. The
-  MCP token's `sub` is the one raw id in flight: Better Auth owns that claim,
-  and the column and `authUserId` both accept it.
+  the column, `authUserId` for Better Auth's adapter and its OAuth tables; both
+  refuse a raw uuid. The MCP token's `sub` stays raw (Better Auth owns that
+  claim), so `/api/mcp` encodes it once at the edge.
 - A workbook owned by someone else is reported **missing** (404), never
   forbidden (403). A 403 would confirm that the id exists.
 

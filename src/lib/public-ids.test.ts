@@ -3,6 +3,8 @@ import { makeSignature } from "better-auth/crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { ids } from "@/lib/ids";
+
 /**
  * User ids are `usr_…` wherever the browser or an outside program sees them,
  * while Better Auth's tables keep the raw uuid. Against a real PGlite, with the
@@ -69,8 +71,7 @@ describe("public user ids", () => {
 		expect(session.session.userId).toBe(session.user.id);
 	});
 
-	it("stores the raw uuid and finds it by usr_ id or raw MCP subject", async () => {
-		const { ids } = await import("@/lib/ids");
+	it("stores the raw uuid, finds it by usr_ id and refuses a raw one", async () => {
 		const usr = ids.user.encode(RAW);
 		const created = await workbooks.createWorkbook({
 			userId: usr,
@@ -81,10 +82,11 @@ describe("public user ids", () => {
 		expect(
 			await execute(`update workbook set name = name where user_id = $1`, [RAW]),
 		).toBe(1);
-		for (const owner of [usr, RAW]) {
-			const listed = await workbooks.listWorkbooks(owner);
-			expect(listed.map((w) => w.id)).toEqual([created.id]);
-		}
+		const listed = await workbooks.listWorkbooks(usr);
+		expect(listed.map((w) => w.id)).toEqual([created.id]);
 		expect(await connectedApps.listConnectedApps(usr)).toEqual([]);
+		// One form: a raw uuid is refused before it reaches a query.
+		await expect(workbooks.listWorkbooks(RAW)).rejects.toThrow();
+		await expect(connectedApps.hasConsent(RAW, "any-client")).rejects.toThrow();
 	});
 });

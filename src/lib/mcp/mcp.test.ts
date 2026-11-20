@@ -1,6 +1,8 @@
 import type { TestDb } from "@ingram-tech/nk-db/pglite";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { ids } from "@/lib/ids";
+
 /**
  * Integration tests for the MCP surface, against a real Postgres (PGlite) and
  * the real wasm engine. Nothing here is mocked: the point is to prove that a
@@ -27,8 +29,12 @@ let getWorkbookMeta: typeof import("@/lib/workbooks").getWorkbookMeta;
 let saveWorkbookBytes: typeof import("@/lib/workbooks").saveWorkbookBytes;
 let withNewSession: typeof import("@/lib/sheetkit-server").withNewSession;
 
-const ALICE = "11111111-1111-7111-8111-111111111111";
-const BOB = "22222222-2222-7222-8222-222222222222";
+// Better Auth's rows hold the raw uuid; the app (and the MCP route, past its
+// edge) holds the public id.
+const ALICE_RAW = "11111111-1111-7111-8111-111111111111";
+const BOB_RAW = "22222222-2222-7222-8222-222222222222";
+const ALICE = ids.user.encode(ALICE_RAW);
+const BOB = ids.user.encode(BOB_RAW);
 
 beforeAll(async () => {
 	const { createTestDb } = await import("@ingram-tech/nk-db/pglite");
@@ -58,8 +64,8 @@ beforeEach(async () => {
 	// anything. Raw SQL because those tables are deliberately outside the
 	// drizzle schema.
 	for (const [id, email] of [
-		[ALICE, "alice@example.com"],
-		[BOB, "bob@example.com"],
+		[ALICE_RAW, "alice@example.com"],
+		[BOB_RAW, "bob@example.com"],
 	]) {
 		await execute(
 			`insert into "user" ("id", "name", "email", "emailVerified")

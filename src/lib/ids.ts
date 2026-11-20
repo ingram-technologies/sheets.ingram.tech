@@ -25,17 +25,17 @@ export const { idColumn } = createIdColumns(ids);
 /**
  * `idColumn` for a reference to Better Auth's `user.id`, which nk-auth's chain
  * stores as `text` (holding a UUIDv7). Same codec, `text` on the driver side,
- * so drizzle-kit sees no schema diff. A raw uuid passes through on the way in:
- * the MCP route's subject is the token's raw `sub` (Better Auth owns that claim).
+ * so drizzle-kit sees no schema diff. Only `usr_…` goes in; a raw uuid throws.
  */
 export const userIdColumn = customType<{ data: string; driverData: string }>({
 	dataType: () => "text",
-	toDriver: (value) => ids.user.decodeOrNull(value) ?? value,
+	toDriver: (value) => ids.user.decode(value),
 	fromDriver: (value) => ids.user.encode(value),
 });
 
 /**
- * The raw id Better Auth's own adapter and `auth.api.*` calls take (nk-auth
- * README: they stay raw); the session hands the app `usr_…`.
+ * The raw id Better Auth's own adapter, `auth.api.*` calls and OAuth tables
+ * take (nk-auth README: they stay raw), from the app's `usr_…`. Throws on
+ * anything else.
  */
-export const authUserId = (id: string): string => ids.user.decodeOrNull(id) ?? id;
+export const authUserId = (id: string): string => ids.user.decode(id);

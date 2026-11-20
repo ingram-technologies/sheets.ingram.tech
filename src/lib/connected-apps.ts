@@ -11,8 +11,8 @@ import { authUserId } from "./ids";
  * keeps the grant in its own tables (nk-auth's chain, outside the drizzle
  * schema), so this reads them with plain SQL, and every query takes the
  * owner like lib/workbooks does: someone else's app is simply not found.
- * Those tables key users by Better Auth's raw id, so the owner (`usr_…` from
- * the session, or the MCP token's raw `sub`) is bound through `authUserId`.
+ * Those tables key users by Better Auth's raw id, so the owner (`usr_…`) is
+ * bound through `authUserId`.
  *
  * Disconnecting has to do more than Better Auth's own `delete-consent`, which
  * removes the consent and leaves the client's refresh token working, so the

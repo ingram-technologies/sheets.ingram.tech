@@ -2,6 +2,7 @@ import { requireMcpAuth } from "@better-auth/mcp";
 
 import { auth, mcpResource } from "@/lib/auth";
 import { hasConsent } from "@/lib/connected-apps";
+import { ids } from "@/lib/ids";
 import { handleRpc } from "@/lib/mcp/server";
 
 /**
@@ -58,11 +59,15 @@ export const POST = requireMcpAuth(
 	async (request, claims) => {
 		// A verified token always names its user and its app; refuse one that
 		// somehow does not rather than run tools for nobody.
-		const userId = claims.sub;
+		const sub = claims.sub;
 		const clientId = claims.azp ?? claims.client_id;
-		if (typeof userId !== "string" || typeof clientId !== "string") {
+		if (typeof sub !== "string" || typeof clientId !== "string") {
 			return Response.json({ error: "token has no subject" }, { status: 401 });
 		}
+		// Better Auth owns `sub` and keeps it a raw uuid; skin it once here so
+		// everything inward holds the public `usr_…` id (nk-auth README).
+		// oxlint-disable-next-line nextkit/no-id-codec-in-app-code -- the OAuth sub is the one raw id entering the app
+		const userId = ids.user.encode(sub);
 		// The signature says the token was issued; only the consent says it is
 		// still wanted. Disconnecting an app in Connected apps removes the
 		// consent, and this is where that bites (see lib/connected-apps).
