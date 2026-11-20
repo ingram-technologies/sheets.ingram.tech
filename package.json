@@ -34,6 +34,7 @@
 		"@ingram-cloud/sdk": "^2.6.0",
 		"@ingram-tech/nk-auth": "^0.22.1",
 		"@ingram-tech/nk-db": "^2.4.0",
+		"@ingram-tech/nk-seo": "^0.11.0",
 		"@ironcalc/wasm": "file:vendor/ironcalc-wasm",
 		"ai": "^7.0.177",
 		"better-auth": "1.7.15",
@@ -57,7 +58,7 @@
 	"devDependencies": {
 		"@electric-sql/pglite": "^0.5.17",
 		"@electric-sql/pglite-socket": "^0.2.20",
-		"@ingram-tech/nk-dev": "^0.24.0",
+		"@ingram-tech/nk-dev": "^0.26.0",
 		"@tailwindcss/postcss": "^4.3.5",
 		"@types/node": "^26.6.6",
 		"@types/pg": "^8.20.3",
