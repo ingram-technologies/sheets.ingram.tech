@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { pool } from "./db";
+import { authUserId } from "./ids";
 
 /**
  * The programs a user has let into their workbooks over MCP, and the way to
@@ -10,6 +11,8 @@ import { pool } from "./db";
  * keeps the grant in its own tables (nk-auth's chain, outside the drizzle
  * schema), so this reads them with plain SQL, and every query takes the
  * owner like lib/workbooks does: someone else's app is simply not found.
+ * Those tables key users by Better Auth's raw id, so the owner (`usr_…` from
+ * the session, or the MCP token's raw `sub`) is bound through `authUserId`.
  *
  * Disconnecting has to do more than Better Auth's own `delete-consent`, which
  * removes the consent and leaves the client's refresh token working, so the
@@ -53,7 +56,7 @@ export async function listConnectedApps(userId: string): Promise<ConnectedApp[]>
 		  where c."userId" = $1
 		  group by c."clientId", cl.name, cl.uri
 		  order by "connectedAt" desc`,
-		[userId],
+		[authUserId(userId)],
 	);
 	return z
 		.array(rowSchema)
@@ -75,16 +78,16 @@ export async function disconnectApp(
 		await client.query("begin");
 		const consents = await client.query(
 			`delete from "oauthConsent" where "userId" = $1 and "clientId" = $2`,
-			[userId, clientId],
+			[authUserId(userId), clientId],
 		);
 		// Access tokens first: they reference the refresh token they came from.
 		await client.query(
 			`delete from "oauthAccessToken" where "userId" = $1 and "clientId" = $2`,
-			[userId, clientId],
+			[authUserId(userId), clientId],
 		);
 		await client.query(
 			`delete from "oauthRefreshToken" where "userId" = $1 and "clientId" = $2`,
-			[userId, clientId],
+			[authUserId(userId), clientId],
 		);
 		await client.query("commit");
 		return (consents.rowCount ?? 0) > 0;
@@ -100,7 +103,7 @@ export async function disconnectApp(
 export async function hasConsent(userId: string, clientId: string): Promise<boolean> {
 	const { rowCount } = await pool.query(
 		`select 1 from "oauthConsent" where "userId" = $1 and "clientId" = $2 limit 1`,
-		[userId, clientId],
+		[authUserId(userId), clientId],
 	);
 	return (rowCount ?? 0) > 0;
 }

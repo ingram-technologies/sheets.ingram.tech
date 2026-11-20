@@ -47,7 +47,8 @@ export type InferenceContext = {
 /**
  * The identity string that names one user's smith. It rides the ai-sdk
  * `user` field the chat route sends; IC lazily provisions the smith for
- * `(user, agent)` on first touch and reuses it after.
+ * `(user, agent)` on first touch and reuses it after. `userId` is the public
+ * `usr_…` id, so IC never sees a raw uuid.
  */
 export function smithExternalId(userId: string): string {
 	return `user:${userId}`;

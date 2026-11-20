@@ -1,9 +1,11 @@
 import { createAuthHelpers } from "@ingram-tech/nk-auth/server";
 
 import { auth } from "@/lib/auth";
+import { ids } from "@/lib/ids";
 
+// Session user ids in public form (`usr_…`), as the userIdColumn reads them.
 export const { getSession, getUser, requireUser, redirectIfAuthenticated } =
-	createAuthHelpers(auth);
+	createAuthHelpers(auth, { ids: { user: ids.user } });
 
 /**
  * Session gate for API routes. Returns either a 401 Response to hand straight

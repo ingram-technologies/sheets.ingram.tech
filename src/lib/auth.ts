@@ -1,10 +1,16 @@
-import { authBasePath, authSecret, uuidGenerateId } from "@ingram-tech/nk-auth";
+import {
+	authBasePath,
+	authSecret,
+	publicSessionIds,
+	uuidGenerateId,
+} from "@ingram-tech/nk-auth";
 import { mcpAuthServer } from "@ingram-tech/nk-auth/mcp";
 import { betterAuth } from "better-auth";
 import { jwt } from "better-auth/plugins";
 
 import { pool } from "@/lib/db";
 import { DRIVE_FILE_SCOPE } from "@/lib/gsheets-transfer";
+import { ids } from "@/lib/ids";
 
 /**
  * Google-only sign-in via the shared Ingram Google OAuth client (the same
@@ -44,6 +50,9 @@ export const auth = betterAuth({
 		},
 	},
 	plugins: [
+		// The browser's session (get-session, list-sessions) carries `usr_…`,
+		// as the server helpers do.
+		publicSessionIds({ ids: { user: ids.user } }),
 		// Signs the MCP access tokens, so /api/mcp verifies them against our
 		// JWKS instead of a database lookup per call.
 		jwt(),
